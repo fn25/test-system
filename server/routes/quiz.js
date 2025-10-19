@@ -6,10 +6,6 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-/**
- * GET /api/quiz
- * Get all quizzes (with pagination and filtering)
- */
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const {
@@ -24,12 +20,9 @@ router.get('/', authenticateToken, async (req, res) => {
     const offset = (page - 1) * limit;
     const where = {};
 
-    // Apply filters
     if (category) where.category = category;
     if (difficulty) where.difficulty = difficulty;
     if (isPublic !== undefined) where.isPublic = isPublic === 'true';
-    
-    // For non-admin users, only show active and public quizzes or their own
     if (req.user.role !== 'admin') {
       where.isActive = true;
       where[Op.or] = [
@@ -37,8 +30,6 @@ router.get('/', authenticateToken, async (req, res) => {
         { createdBy: req.user.id }
       ];
     }
-
-    // Search functionality
     if (search) {
       where[Op.or] = [
         { title: { [Op.iLike]: `%${search}%` } },
@@ -66,7 +57,6 @@ router.get('/', authenticateToken, async (req, res) => {
       offset: parseInt(offset)
     });
 
-    // Add question count to each quiz
     const quizzesWithCounts = quizzes.map(quiz => {
       const quizData = quiz.toJSON();
       quizData.questionCount = quiz.questions.length;
@@ -97,10 +87,7 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-/**
- * GET /api/quiz/:id
- * Get a specific quiz by ID
- */
+
 router.get('/:id', authenticateToken, [
   param('id').isUUID().withMessage('Invalid quiz ID')
 ], async (req, res) => {
@@ -142,10 +129,9 @@ router.get('/:id', authenticateToken, [
       });
     }
 
-    // Check permissions
-    const canView = quiz.isPublic || 
-                   quiz.createdBy === req.user.id || 
-                   req.user.role === 'admin';
+  const canView = quiz.isPublic || 
+           quiz.createdBy === req.user.id || 
+           req.user.role === 'admin';
 
     if (!canView) {
       return res.status(403).json({
@@ -169,10 +155,7 @@ router.get('/:id', authenticateToken, [
   }
 });
 
-/**
- * POST /api/quiz
- * Create a new quiz (Admin only)
- */
+
 router.post('/', authenticateToken, requireAdmin, [
   body('title')
     .isLength({ min: 1, max: 200 })
@@ -219,7 +202,6 @@ router.post('/', authenticateToken, requireAdmin, [
 
     const quiz = await Quiz.create(quizData);
 
-    // Fetch the created quiz with creator information
     const createdQuiz = await Quiz.findByPk(quiz.id, {
       include: [
         {
@@ -245,10 +227,7 @@ router.post('/', authenticateToken, requireAdmin, [
   }
 });
 
-/**
- * PUT /api/quiz/:id
- * Update a quiz (Admin only)
- */
+
 router.put('/:id', authenticateToken, requireAdmin, [
   param('id').isUUID().withMessage('Invalid quiz ID'),
   body('title')
@@ -302,7 +281,6 @@ router.put('/:id', authenticateToken, requireAdmin, [
 
     await quiz.update(req.body);
 
-    // Fetch updated quiz with creator information
     const updatedQuiz = await Quiz.findByPk(quiz.id, {
       include: [
         {
@@ -328,10 +306,7 @@ router.put('/:id', authenticateToken, requireAdmin, [
   }
 });
 
-/**
- * DELETE /api/quiz/:id
- * Delete a quiz (Admin only)
- */
+
 router.delete('/:id', authenticateToken, requireAdmin, [
   param('id').isUUID().withMessage('Invalid quiz ID')
 ], async (req, res) => {
@@ -371,10 +346,7 @@ router.delete('/:id', authenticateToken, requireAdmin, [
   }
 });
 
-/**
- * POST /api/quiz/:id/questions
- * Add a question to a quiz (Admin only)
- */
+
 router.post('/:id/questions', authenticateToken, requireAdmin, [
   param('id').isUUID().withMessage('Invalid quiz ID'),
   body('question')
@@ -419,7 +391,6 @@ router.post('/:id/questions', authenticateToken, requireAdmin, [
       });
     }
 
-    // If no order specified, set it to be last
     if (!req.body.order) {
       const maxOrder = await Question.max('order', { where: { quizId: id } });
       req.body.order = (maxOrder || 0) + 1;
@@ -447,10 +418,7 @@ router.post('/:id/questions', authenticateToken, requireAdmin, [
   }
 });
 
-/**
- * PUT /api/quiz/:quizId/questions/:questionId
- * Update a question (Admin only)
- */
+
 router.put('/:quizId/questions/:questionId', authenticateToken, requireAdmin, [
   param('quizId').isUUID().withMessage('Invalid quiz ID'),
   param('questionId').isUUID().withMessage('Invalid question ID'),
@@ -519,10 +487,7 @@ router.put('/:quizId/questions/:questionId', authenticateToken, requireAdmin, [
   }
 });
 
-/**
- * DELETE /api/quiz/:quizId/questions/:questionId
- * Delete a question (Admin only)
- */
+
 router.delete('/:quizId/questions/:questionId', authenticateToken, requireAdmin, [
   param('quizId').isUUID().withMessage('Invalid quiz ID'),
   param('questionId').isUUID().withMessage('Invalid question ID')

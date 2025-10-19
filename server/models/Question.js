@@ -22,18 +22,15 @@ export default (sequelize) => {
     },
     options: {
       type: DataTypes.JSON,
-      allowNull: true,
-      comment: 'Array of options for multiple choice questions'
+      allowNull: true
     },
     correctAnswer: {
       type: DataTypes.TEXT,
-      allowNull: false,
-      comment: 'For multiple choice: option index, for true/false: true/false, for short answer: the answer text'
+      allowNull: false
     },
     explanation: {
       type: DataTypes.TEXT,
-      allowNull: true,
-      comment: 'Explanation shown after answering the question'
+      allowNull: true
     },
     points: {
       type: DataTypes.INTEGER,
@@ -45,19 +42,16 @@ export default (sequelize) => {
     },
     imageUrl: {
       type: DataTypes.STRING,
-      allowNull: true,
-      comment: 'URL of uploaded image from Cloudinary'
+      allowNull: true
     },
     videoUrl: {
       type: DataTypes.STRING,
-      allowNull: true,
-      comment: 'URL of uploaded video from Cloudinary'
+      allowNull: true
     },
     order: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      defaultValue: 0,
-      comment: 'Order of the question in the quiz'
+      defaultValue: 0
     },
     quizId: {
       type: DataTypes.UUID,
@@ -79,13 +73,11 @@ export default (sequelize) => {
       }
     ],
     validate: {
-      // Custom validation to ensure options are provided for multiple choice questions
       optionsRequiredForMultipleChoice() {
         if (this.type === 'multiple_choice' && (!this.options || !Array.isArray(this.options) || this.options.length < 2)) {
           throw new Error('Multiple choice questions must have at least 2 options');
         }
       },
-      // Validate correct answer format based on question type
       correctAnswerFormat() {
         if (this.type === 'multiple_choice') {
           const answerIndex = parseInt(this.correctAnswer);

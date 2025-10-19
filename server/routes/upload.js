@@ -5,34 +5,29 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Configure ImageKit
 const imagekit = new ImageKit({
   publicKey: process.env.IMAGEKIT_PUBLIC_KEY,
   privateKey: process.env.IMAGEKIT_PRIVATE_KEY,
   urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
 
-// Configure multer for memory storage
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+  fileSize: 10 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
-    // Allow images and videos
+  if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
     if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       cb(null, true);
     } else {
-      cb(new Error('Only image and video files are allowed'), false);
+  cb(new Error('Only image and video files are allowed'), false);
     }
   }
-});
+}});
 
-/**
- * POST /api/upload/image
- * Upload image to ImageKit (Admin only)
- */
+
 router.post('/image', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -43,7 +38,7 @@ router.post('/image', authenticateToken, requireAdmin, upload.single('image'), a
     }
 
     const result = await imagekit.upload({
-      file: req.file.buffer.toString('base64'), // Convert file to Base64
+  file: req.file.buffer.toString('base64'),
       fileName: req.file.originalname
     });
 
@@ -65,10 +60,7 @@ router.post('/image', authenticateToken, requireAdmin, upload.single('image'), a
   }
 });
 
-/**
- * POST /api/upload/video
- * Upload video to ImageKit (Admin only)
- */
+
 router.post('/video', authenticateToken, requireAdmin, upload.single('video'), async (req, res) => {
   try {
     if (!req.file) {
@@ -79,7 +71,7 @@ router.post('/video', authenticateToken, requireAdmin, upload.single('video'), a
     }
 
     const result = await imagekit.upload({
-      file: req.file.buffer.toString('base64'), // Convert file to Base64
+  file: req.file.buffer.toString('base64'),
       fileName: req.file.originalname
     });
 
@@ -101,10 +93,7 @@ router.post('/video', authenticateToken, requireAdmin, upload.single('video'), a
   }
 });
 
-/**
- * DELETE /api/upload/:fileId
- * Delete file from ImageKit (Admin only)
- */
+
 router.delete('/:fileId', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -132,10 +121,7 @@ router.delete('/:fileId', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-/**
- * GET /api/upload/list
- * List uploaded files (Admin only)
- */
+
 router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { 
@@ -146,9 +132,9 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
 
     const options = {
       resource_type,
-      type: 'upload',
-      prefix: 'quiz-app/',
-      max_results: parseInt(max_results)
+  type: 'upload',
+  prefix: 'quiz-app/',
+  max_results: parseInt(max_results)
     };
 
     if (next_cursor) {
@@ -190,9 +176,7 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-/**
- * Error handling middleware for multer
- */
+
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {

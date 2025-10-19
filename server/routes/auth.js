@@ -7,9 +7,6 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-/**
- * Generate JWT token for a user
- */
 const generateToken = (userId) => {
   return jwt.sign(
     { userId },
@@ -18,10 +15,6 @@ const generateToken = (userId) => {
   );
 };
 
-/**
- * POST /api/auth/register
- * Register a new user
- */
 router.post('/register', [
   body('username')
     .isLength({ min: 3, max: 30 })
@@ -45,7 +38,6 @@ router.post('/register', [
     .withMessage('Last name must be less than 50 characters')
 ], async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -57,7 +49,6 @@ router.post('/register', [
 
     const { username, email, password, firstName, lastName } = req.body;
 
-    // Check if user already exists
     const existingUser = await User.findOne({
       where: {
         [Op.or]: [{ email }, { username }]
@@ -71,17 +62,15 @@ router.post('/register', [
       });
     }
 
-    // Create new user
     const user = await User.create({
       username,
       email,
       password,
       firstName,
       lastName,
-      role: 'user' // Default role
+  role: 'user'
     });
 
-    // Generate token
     const token = generateToken(user.id);
 
     res.status(201).json({
@@ -102,10 +91,6 @@ router.post('/register', [
   }
 });
 
-/**
- * POST /api/auth/login
- * Login user
- */
 router.post('/login', [
   body('login')
     .notEmpty()
@@ -115,7 +100,6 @@ router.post('/login', [
     .withMessage('Password is required')
 ], async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -127,7 +111,6 @@ router.post('/login', [
 
     const { login, password } = req.body;
 
-    // Find user by username or email
     const user = await User.findOne({
       where: {
         [Op.or]: [
@@ -144,7 +127,6 @@ router.post('/login', [
       });
     }
 
-    // Check if user is active
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
@@ -152,7 +134,6 @@ router.post('/login', [
       });
     }
 
-    // Validate password
     const isPasswordValid = await user.validatePassword(password);
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -161,7 +142,6 @@ router.post('/login', [
       });
     }
 
-    // Generate token
     const token = generateToken(user.id);
 
     res.json({
@@ -182,10 +162,6 @@ router.post('/login', [
   }
 });
 
-/**
- * GET /api/auth/profile
- * Get current user profile
- */
 router.get('/profile', authenticateToken, async (req, res) => {
   try {
     res.json({
@@ -205,10 +181,6 @@ router.get('/profile', authenticateToken, async (req, res) => {
   }
 });
 
-/**
- * PUT /api/auth/profile
- * Update current user profile
- */
 router.put('/profile', authenticateToken, [
   body('firstName')
     .optional()
@@ -225,7 +197,6 @@ router.put('/profile', authenticateToken, [
     .normalizeEmail()
 ], async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -238,7 +209,6 @@ router.put('/profile', authenticateToken, [
     const { firstName, lastName, email } = req.body;
     const user = req.user;
 
-    // Check if email is being changed and if it's already taken
     if (email && email !== user.email) {
       const existingUser = await User.findOne({ where: { email } });
       if (existingUser) {
@@ -249,7 +219,6 @@ router.put('/profile', authenticateToken, [
       }
     }
 
-    // Update user
     await user.update({
       firstName: firstName !== undefined ? firstName : user.firstName,
       lastName: lastName !== undefined ? lastName : user.lastName,
@@ -273,10 +242,6 @@ router.put('/profile', authenticateToken, [
   }
 });
 
-/**
- * POST /api/auth/change-password
- * Change user password
- */
 router.post('/change-password', authenticateToken, [
   body('currentPassword')
     .notEmpty()
@@ -286,7 +251,6 @@ router.post('/change-password', authenticateToken, [
     .withMessage('New password must be at least 6 characters long')
 ], async (req, res) => {
   try {
-    // Check for validation errors
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({
@@ -299,7 +263,6 @@ router.post('/change-password', authenticateToken, [
     const { currentPassword, newPassword } = req.body;
     const user = req.user;
 
-    // Validate current password
     const isCurrentPasswordValid = await user.validatePassword(currentPassword);
     if (!isCurrentPasswordValid) {
       return res.status(401).json({
@@ -308,7 +271,6 @@ router.post('/change-password', authenticateToken, [
       });
     }
 
-    // Update password
     await user.update({ password: newPassword });
 
     res.json({
@@ -325,10 +287,6 @@ router.post('/change-password', authenticateToken, [
   }
 });
 
-/**
- * POST /api/auth/verify-token
- * Verify if token is valid
- */
 router.post('/verify-token', authenticateToken, (req, res) => {
   res.json({
     success: true,

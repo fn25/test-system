@@ -61,14 +61,12 @@ export default (sequelize) => {
     timestamps: true,
     tableName: 'users',
     hooks: {
-      // Hash password before creating user
       beforeCreate: async (user) => {
         if (user.password) {
           const salt = await bcrypt.genSalt(12);
           user.password = await bcrypt.hash(user.password, salt);
         }
       },
-      // Hash password before updating user
       beforeUpdate: async (user) => {
         if (user.changed('password')) {
           const salt = await bcrypt.genSalt(12);
@@ -78,12 +76,10 @@ export default (sequelize) => {
     }
   });
 
-  // Instance method to check password
   User.prototype.validatePassword = async function(password) {
     return await bcrypt.compare(password, this.password);
   };
 
-  // Instance method to get public user data
   User.prototype.toJSON = function() {
     const values = { ...this.get() };
     delete values.password;

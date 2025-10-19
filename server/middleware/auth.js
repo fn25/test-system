@@ -1,14 +1,10 @@
 import jwt from 'jsonwebtoken';
 import { User } from '../models/index.js';
 
-/**
- * Middleware to authenticate JWT tokens
- * Verifies the token and adds user information to the request object
- */
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
@@ -17,10 +13,8 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    // Find user by ID from token
     const user = await User.findByPk(decoded.userId);
     
     if (!user || !user.isActive) {
@@ -30,7 +24,6 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    // Add user to request object
     req.user = user;
     next();
   } catch (error) {
@@ -57,10 +50,6 @@ const authenticateToken = async (req, res, next) => {
   }
 };
 
-/**
- * Middleware to check if user has admin role
- * Should be used after authenticateToken middleware
- */
 const requireAdmin = (req, res, next) => {
   if (!req.user) {
     return res.status(401).json({
@@ -79,10 +68,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-/**
- * Middleware to check if user has admin role or is accessing their own data
- * Should be used after authenticateToken middleware
- */
 const requireAdminOrOwner = (userIdParam = 'userId') => {
   return (req, res, next) => {
     if (!req.user) {
@@ -94,7 +79,6 @@ const requireAdminOrOwner = (userIdParam = 'userId') => {
 
     const targetUserId = req.params[userIdParam] || req.body[userIdParam];
     
-    // Allow if user is admin or accessing their own data
     if (req.user.role === 'admin' || req.user.id === targetUserId) {
       next();
     } else {

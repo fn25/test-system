@@ -7,7 +7,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 
-// Ensure SSL configuration for Neon database
 const isNeon = process.env.DATABASE_URL.includes('neon.tech');
 const sslConfig = isNeon ? {
   ssl: {
@@ -16,7 +15,6 @@ const sslConfig = isNeon ? {
   }
 } : {};
 
-// Create Sequelize instance using DATABASE_URL from environment
 export const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
   dialectOptions: sslConfig,
@@ -29,7 +27,6 @@ export const sequelize = new Sequelize(process.env.DATABASE_URL, {
   }
 });
 
-// Import models (factory functions)
 import defineUser from './User.js';
 import defineQuiz from './Quiz.js';
 import defineQuestion from './Question.js';
@@ -40,7 +37,6 @@ export const Quiz = defineQuiz(sequelize);
 export const Question = defineQuestion(sequelize);
 export const Result = defineResult(sequelize);
 
-// Define associations
 User.hasMany(Quiz, { foreignKey: 'createdBy', as: 'createdQuizzes' });
 Quiz.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 

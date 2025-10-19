@@ -5,10 +5,7 @@ import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-/**
- * POST /api/result/submit
- * Submit quiz answers and calculate results
- */
+
 router.post('/submit', authenticateToken, [
   body('quizId')
     .isUUID()
@@ -38,7 +35,6 @@ router.post('/submit', authenticateToken, [
     const { quizId, answers, timeSpent, startedAt } = req.body;
     const userId = req.user.id;
 
-    // Find the quiz with questions
     const quiz = await Quiz.findByPk(quizId, {
       include: [
         {
@@ -56,7 +52,6 @@ router.post('/submit', authenticateToken, [
       });
     }
 
-    // Check if quiz is active and accessible
     if (!quiz.isActive) {
       return res.status(403).json({
         success: false,
@@ -72,7 +67,6 @@ router.post('/submit', authenticateToken, [
       });
     }
 
-    // Check attempt limits
     if (quiz.maxAttempts) {
       const previousAttempts = await Result.count({
         where: { userId, quizId }
@@ -86,15 +80,13 @@ router.post('/submit', authenticateToken, [
       }
     }
 
-    // Calculate results
     let correctAnswers = 0;
     let totalPoints = 0;
     let pointsEarned = 0;
     const processedAnswers = [];
 
     quiz.questions.forEach(question => {
-      totalPoints += question.points;
-      
+  totalPoints += question.points;
       const userAnswer = answers.find(a => a.questionId === question.id);
       const isCorrect = userAnswer && 
         String(userAnswer.answer).toLowerCase().trim() === 
@@ -115,16 +107,13 @@ router.post('/submit', authenticateToken, [
       });
     });
 
-    // Calculate score percentage
     const score = totalPoints > 0 ? Math.round((pointsEarned / totalPoints) * 100) : 0;
     const isPassed = score >= (quiz.passingScore || 60);
 
-    // Get attempt number
     const attemptNumber = await Result.count({
       where: { userId, quizId }
     }) + 1;
 
-    // Create result record
     const result = await Result.create({
       userId,
       quizId,
@@ -141,7 +130,6 @@ router.post('/submit', authenticateToken, [
       completedAt: new Date()
     });
 
-    // Fetch result with related data
     const resultWithData = await Result.findByPk(result.id, {
       include: [
         {
@@ -175,10 +163,7 @@ router.post('/submit', authenticateToken, [
   }
 });
 
-/**
- * GET /api/result
- * Get user's quiz results with pagination
- */
+
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const {
@@ -191,7 +176,6 @@ router.get('/', authenticateToken, async (req, res) => {
     const offset = (page - 1) * limit;
     const where = { userId: req.user.id };
 
-    // Apply filters
     if (quizId) where.quizId = quizId;
     if (passed !== undefined) where.isPassed = passed === 'true';
 
@@ -232,10 +216,7 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-/**
- * GET /api/result/:id
- * Get specific result by ID
- */
+
 router.get('/:id', authenticateToken, [
   param('id').isUUID().withMessage('Invalid result ID')
 ], async (req, res) => {
@@ -281,7 +262,6 @@ router.get('/:id', authenticateToken, [
       });
     }
 
-    // Check permissions
     const canView = result.userId === req.user.id || req.user.role === 'admin';
     if (!canView) {
       return res.status(403).json({
@@ -308,10 +288,7 @@ router.get('/:id', authenticateToken, [
   }
 });
 
-/**
- * GET /api/result/quiz/:quizId
- * Get all results for a specific quiz (Admin only)
- */
+
 router.get('/quiz/:quizId', authenticateToken, requireAdmin, [
   param('quizId').isUUID().withMessage('Invalid quiz ID')
 ], async (req, res) => {
@@ -347,7 +324,7 @@ router.get('/quiz/:quizId', authenticateToken, requireAdmin, [
     } else if (sortBy === 'time') {
       orderBy.push(['timeSpent', sortOrder.toUpperCase()]);
     }
-    orderBy.push(['createdAt', 'DESC']); // Secondary sort
+  orderBy.push(['createdAt', 'DESC']);
 
     const { count, rows: results } = await Result.findAndCountAll({
       where,
@@ -368,7 +345,6 @@ router.get('/quiz/:quizId', authenticateToken, requireAdmin, [
       offset: parseInt(offset)
     });
 
-    // Calculate statistics
     const stats = await Result.findOne({
       where: { quizId },
       attributes: [
@@ -414,10 +390,7 @@ router.get('/quiz/:quizId', authenticateToken, requireAdmin, [
   }
 });
 
-/**
- * GET /api/result/user/:userId
- * Get all results for a specific user (Admin only)
- */
+
 router.get('/user/:userId', authenticateToken, requireAdmin, [
   param('userId').isUUID().withMessage('Invalid user ID')
 ], async (req, res) => {
@@ -478,10 +451,7 @@ router.get('/user/:userId', authenticateToken, requireAdmin, [
   }
 });
 
-/**
- * DELETE /api/result/:id
- * Delete a result (Admin only)
- */
+
 router.delete('/:id', authenticateToken, requireAdmin, [
   param('id').isUUID().withMessage('Invalid result ID')
 ], async (req, res) => {
