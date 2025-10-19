@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, User, BookOpen, BarChart3, Settings } from 'lucide-react';
+import { LogOut, User, BookOpen, BarChart3, Settings, Play } from 'lucide-react';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout, isAdmin } = useAuth();
@@ -16,6 +16,36 @@ const Navbar = () => {
   const isActive = (path) => {
     return location.pathname === path;
   };
+
+  // Show simplified navbar for guest access page
+  if (!isAuthenticated && location.pathname === '/play') {
+    return (
+      <nav className="navbar">
+        <div className="navbar-content">
+          <Link to="/play" className="navbar-brand">
+            <BookOpen className="inline-block mr-2" size={24} />
+            TestLash Tizmi
+          </Link>
+          
+          <ul className="navbar-nav">
+            <li>
+              <Link to="/login" className="nav-link">
+                Sign In
+              </Link>
+            </li>
+            <li>
+              <Link to="/register" className="nav-link" style={{ 
+                background: 'rgba(255, 255, 255, 0.2)',
+                fontWeight: 'bold'
+              }}>
+                Create Account
+              </Link>
+            </li>
+          </ul>
+        </div>
+      </nav>
+    );
+  }
 
   if (!isAuthenticated) {
     return null;
@@ -53,6 +83,19 @@ const Navbar = () => {
             >
               <BarChart3 className="inline-block mr-1" size={16} />
               Results
+            </Link>
+          </li>
+          <li>
+            <Link 
+              to="/play" 
+              className={`nav-link ${isActive('/play') ? 'active' : ''}`}
+              style={{ 
+                background: 'rgba(255, 255, 255, 0.15)',
+                fontWeight: '600'
+              }}
+            >
+              <Play className="inline-block mr-1" size={16} />
+              Play Quiz
             </Link>
           </li>
           

@@ -6,6 +6,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import LoginPage from './components/LoginPage';
 import RegisterPage from './components/RegisterPage';
+import ForgotPasswordPage from './components/ForgotPasswordPage';
+import ResetPasswordPage from './components/ResetPasswordPage';
+import GuestAccessPage from './components/GuestAccessPage';
 import HomePage from './components/HomePage';
 import QuizList from './components/QuizList';
 import QuizTaking from './components/QuizTaking';
@@ -79,6 +82,18 @@ const AppContent = () => {
                 <RegisterPage />
               </PublicRoute>
             } 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={<ForgotPasswordPage />} 
+          />
+          <Route 
+            path="/reset-password" 
+            element={<ResetPasswordPage />} 
+          />
+          <Route 
+            path="/play" 
+            element={<GuestAccessPage />} 
           />
 
           {/* Protected routes */}

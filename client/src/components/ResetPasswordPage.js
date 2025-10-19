@@ -1,110 +1,109 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
-import { Eye, EyeOff, UserPlus, Mail, Lock, User, Play } from 'lucide-react';
+import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import '../styles/auth.css';
 
-const RegisterPage = () => {
+const ResetPasswordPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { register: registerUser, isLoading } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  const token = searchParams.get('token');
 
   const {
     register,
     handleSubmit,
     watch,
     formState: { errors }
-  } = useForm({
-    defaultValues: {
-      role: 'user' // Default role
-    }
-  });
+  } = useForm();
 
   const password = watch('password');
 
   const onSubmit = async (data) => {
-    const result = await registerUser(data);
+    if (!token) {
+      toast.error('Invalid or missing reset token');
+      return;
+    }
+
+    setIsLoading(true);
     
-    if (result.success) {
-      toast.success('Registration successful! Welcome to TestLash Tizmi!');
-      navigate('/');
-    } else {
-      toast.error(result.error);
+    try {
+      // TODO: Backend API call
+      // const response = await fetch('/api/auth/reset-password', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ 
+      //     token: token,
+      //     password: data.password 
+      //   })
+      // });
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      toast.success('Password reset successful!');
+      navigate('/login');
+    } catch (error) {
+      toast.error('Failed to reset password. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  if (!token) {
+    return (
+      <div className="auth-page">
+        <div className="auth-container">
+          <div className="auth-header">
+            <div className="auth-icon" style={{ background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)' }}>
+              <Lock className="icon" />
+            </div>
+            <h2 className="auth-title">Invalid Reset Link</h2>
+            <p className="auth-subtitle">
+              This password reset link is invalid or has expired
+            </p>
+          </div>
+
+          <div style={{ textAlign: 'center', padding: '1.5rem 0' }}>
+            <p style={{ color: '#6b7280', marginBottom: '1.5rem' }}>
+              Please request a new password reset link.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            <Link to="/forgot-password" className="btn btn-primary btn-full">
+              Request New Link
+            </Link>
+            <Link to="/login" className="btn btn-secondary btn-full">
+              Back to Login
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">
       <div className="auth-container">
         <div className="auth-header">
           <div className="auth-icon">
-            <UserPlus className="icon" />
+            <Lock className="icon" />
           </div>
-          <h2 className="auth-title">Create Account</h2>
-          <p className="auth-subtitle">Join us and start testing your knowledge</p>
+          <h2 className="auth-title">Reset Password</h2>
+          <p className="auth-subtitle">
+            Create a strong new password for your account
+          </p>
         </div>
         
         <form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
           <div className="form-group">
-            <label htmlFor="username" className="form-label">
-              <User size={18} /> Username
-            </label>
-            <input
-              id="username"
-              type="text"
-              autoComplete="username"
-              className={`form-control ${errors.username ? 'error' : ''}`}
-              placeholder="Choose a username"
-              {...register('username', {
-                required: 'Username is required',
-                minLength: {
-                  value: 3,
-                  message: 'Username must be at least 3 characters'
-                },
-                maxLength: {
-                  value: 30,
-                  message: 'Username must be less than 30 characters'
-                },
-                pattern: {
-                  value: /^[a-zA-Z0-9_]+$/,
-                  message: 'Username can only contain letters, numbers, and underscores'
-                }
-              })}
-            />
-            {errors.username && (
-              <p className="form-error">{errors.username.message}</p>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="email" className="form-label">
-              <Mail size={18} /> Email Address
-            </label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="email"
-              className={`form-control ${errors.email ? 'error' : ''}`}
-              placeholder="your.email@example.com"
-              {...register('email', {
-                required: 'Email is required',
-                pattern: {
-                  value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                  message: 'Please enter a valid email address'
-                }
-              })}
-            />
-            {errors.email && (
-              <p className="form-error">{errors.email.message}</p>
-            )}
-          </div>
-
-          <div className="form-group">
             <label htmlFor="password" className="form-label">
-              <Lock size={18} /> Password
+              <Lock size={18} /> New Password
             </label>
             <div className="password-field">
               <input
@@ -136,7 +135,7 @@ const RegisterPage = () => {
 
           <div className="form-group">
             <label htmlFor="confirmPassword" className="form-label">
-              <Lock size={18} /> Confirm Password
+              <Lock size={18} /> Confirm New Password
             </label>
             <div className="password-field">
               <input
@@ -164,9 +163,6 @@ const RegisterPage = () => {
             )}
           </div>
 
-          {/* Hidden role field - defaults to 'user' */}
-          <input type="hidden" {...register('role')} value="user" />
-
           <button
             type="submit"
             disabled={isLoading}
@@ -175,30 +171,19 @@ const RegisterPage = () => {
             {isLoading ? (
               <div className="btn-loading">
                 <div className="spinner"></div>
-                Creating account...
+                Resetting password...
               </div>
             ) : (
               <>
-                <UserPlus size={20} />
-                Create Account
+                <CheckCircle size={20} />
+                Reset Password
               </>
             )}
           </button>
 
           <div className="form-footer">
-            <p>
-              Already have an account?{' '}
-              <Link to="/login" className="link-primary">
-                Sign in here
-              </Link>
-            </p>
-          </div>
-
-          <div className="guest-access">
-            <p className="guest-access-title">Just browsing?</p>
-            <Link to="/play" className="btn btn-secondary btn-full">
-              <Play size={20} />
-              Try a Quiz Without Account
+            <Link to="/login" className="link-primary">
+              Back to Login
             </Link>
           </div>
         </form>
@@ -207,4 +192,4 @@ const RegisterPage = () => {
   );
 };
 
-export default RegisterPage;
+export default ResetPasswordPage;

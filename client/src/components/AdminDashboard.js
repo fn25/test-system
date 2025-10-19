@@ -7,6 +7,7 @@ import {
 import { quizAPI, resultAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
+import CreateQuizPage from './CreateQuizPage';
 
 const AdminDashboard = () => {
   const location = useLocation();
@@ -67,6 +68,7 @@ const AdminDashboard = () => {
       <Routes>
         <Route path="/" element={<AdminOverview />} />
         <Route path="/quizzes" element={<QuizManagement />} />
+        <Route path="/quizzes/create" element={<CreateQuizPage />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/results" element={<ResultsManagement />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
@@ -161,7 +163,7 @@ const AdminOverview = () => {
       <div className="card">
         <h2 className="card-title mb-4">Quick Actions</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link to="/admin/quizzes" className="btn btn-primary">
+          <Link to="/admin/quizzes/create" className="btn btn-primary">
             <Plus className="w-5 h-5 mr-2" />
             Create New Quiz
           </Link>
@@ -245,10 +247,10 @@ const QuizManagement = () => {
             <h2 className="card-title">Quiz Management</h2>
             <p className="card-subtitle">Create, edit, and manage your quizzes</p>
           </div>
-          <button className="btn btn-primary">
+          <Link to="/admin/quizzes/create" className="btn btn-primary">
             <Plus className="w-5 h-5 mr-2" />
             Create New Quiz
-          </button>
+          </Link>
         </div>
 
         <div className="mt-4 relative">
@@ -327,10 +329,10 @@ const QuizManagement = () => {
               {searchTerm ? 'Try adjusting your search' : 'Get started by creating your first quiz'}
             </p>
             {!searchTerm && (
-              <button className="btn btn-primary">
+              <Link to="/admin/quizzes/create" className="btn btn-primary">
                 <Plus className="w-5 h-5 mr-2" />
                 Create New Quiz
-              </button>
+              </Link>
             )}
           </div>
         )}
