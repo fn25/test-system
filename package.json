@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server/server.js",
     "dev": "cd server && nodemon server.js",
-    "build": "cd server && npm install",
+    "build": "npm install && npm run migrate",
+    "migrate": "node server/migrate.js",
     "install-server": "cd server && npm install",
     "install-client": "cd client && npm install"
   },

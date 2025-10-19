@@ -4,6 +4,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { sequelize } from './models/index.js';
+import { Sequelize } from 'sequelize';
+import fs from 'fs';
 
 import authRoutes from './routes/auth.js';
 import quizRoutes from './routes/quiz.js';
@@ -91,6 +93,80 @@ app.use('*', (req, res) => {
   });
 });
 
+// Migration runner function
+const runMigrations = async () => {
+  try {
+    // Create SequelizeMeta table if it doesn't exist
+    await sequelize.query(`
+      CREATE TABLE IF NOT EXISTS "SequelizeMeta" (
+        name VARCHAR(255) NOT NULL PRIMARY KEY
+      );
+    `);
+
+    // Get list of already run migrations
+    const [executedMigrations] = await sequelize.query(
+      'SELECT name FROM "SequelizeMeta"'
+    );
+    const executedNames = executedMigrations.map(m => m.name);
+
+    // Get all migration files
+    const migrationsDir = path.join(__dirname, 'migrations');
+    
+    if (!fs.existsSync(migrationsDir)) {
+      console.log('📂 No migrations directory found, skipping migrations');
+      return;
+    }
+
+    const migrationFiles = fs.readdirSync(migrationsDir)
+      .filter(file => file.endsWith('.js'))
+      .sort();
+
+    if (migrationFiles.length === 0) {
+      console.log('📂 No migration files found');
+      return;
+    }
+
+    console.log(`📂 Found ${migrationFiles.length} migration file(s)`);
+
+    // Run each migration that hasn't been executed yet
+    for (const file of migrationFiles) {
+      if (executedNames.includes(file)) {
+        console.log(`⏭️  Skipping ${file} (already executed)`);
+        continue;
+      }
+
+      console.log(`🔄 Running migration: ${file}`);
+      
+      try {
+        const migrationPath = path.join(migrationsDir, file);
+        const migration = await import(`file://${migrationPath}`);
+        
+        // Create QueryInterface instance
+        const queryInterface = sequelize.getQueryInterface();
+        
+        // Run the migration
+        await migration.up(queryInterface, Sequelize);
+        
+        // Record the migration as executed
+        await sequelize.query(
+          'INSERT INTO "SequelizeMeta" (name) VALUES (?)',
+          { replacements: [file] }
+        );
+        
+        console.log(`✅ Migration ${file} completed successfully`);
+      } catch (migrationError) {
+        console.error(`❌ Error running migration ${file}:`, migrationError.message);
+        throw migrationError;
+      }
+    }
+
+    console.log('✅ All migrations completed successfully');
+  } catch (error) {
+    console.error('❌ Migration error:', error.message);
+    throw error;
+  }
+};
+
 const startServer = async () => {
   try {
     console.log('🔄 Starting server...');
@@ -98,9 +174,19 @@ const startServer = async () => {
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully.');
 
+    console.log('🔄 Running database migrations...');
+    try {
+      // Run migrations programmatically
+      await runMigrations();
+      console.log('✅ Database migrations completed.');
+    } catch (migrationError) {
+      console.error('⚠️ Migration warning:', migrationError.message);
+      console.log('Continuing without migrations...');
+    }
+
     console.log('🔄 Synchronizing database models...');
     try {
-      await sequelize.sync({ force: false });
+      await sequelize.sync({ alter: false });
       console.log('✅ Database models synchronized.');
     } catch (syncError) {
       console.error('⚠️ Database sync warning:', syncError.message);
