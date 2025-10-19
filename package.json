@@ -4,7 +4,7 @@
   "description": "A fully functional test-solving web application with admin panel, user authentication, image/video upload via Cloudinary, and PostgreSQL database. Built with Node.js/Express backend and React frontend.",
   "main": "server/server.js",
   "scripts": {
-    "start": "cd server && npm install && node server.js",
+    "start": "node server/server.js",
     "dev": "cd server && nodemon server.js",
     "install-server": "cd server && npm install",
     "install-client": "cd client && npm install"
