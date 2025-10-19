@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-hot-toast';
@@ -8,8 +8,18 @@ import '../styles/auth.css';
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [searchParams] = useSearchParams();
   const { login, isLoading } = useAuth();
   const navigate = useNavigate();
+
+  const redirectPath = searchParams.get('redirect');
+  const quizCode = searchParams.get('code');
+
+  useEffect(() => {
+    if (quizCode) {
+      toast.info(`Quiz code: ${quizCode}. Please login to continue.`);
+    }
+  }, [quizCode]);
 
   const {
     register,
@@ -22,7 +32,15 @@ const LoginPage = () => {
     
     if (result.success) {
       toast.success('Login successful!');
-      navigate('/');
+      
+      // If there's a redirect path and quiz code, redirect to play page with code
+      if (redirectPath && quizCode) {
+        navigate(`${redirectPath}?code=${quizCode}`);
+      } else if (redirectPath) {
+        navigate(redirectPath);
+      } else {
+        navigate('/');
+      }
     } else {
       toast.error(result.error);
     }

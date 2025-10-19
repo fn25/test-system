@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Play, Hash, ArrowRight } from 'lucide-react';
 import '../styles/auth.css';
@@ -7,7 +7,17 @@ import '../styles/auth.css';
 const GuestAccessPage = () => {
   const [quizCode, setQuizCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if there's a quiz code in URL params
+    const codeFromUrl = searchParams.get('code');
+    if (codeFromUrl) {
+      setQuizCode(codeFromUrl.toUpperCase());
+      toast.info('Quiz code loaded. Click "Start Quiz" to begin.');
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,12 +30,33 @@ const GuestAccessPage = () => {
     setIsLoading(true);
     
     try {
+      // Check if user is logged in
+      const token = localStorage.getItem('token');
+      
+      if (!token) {
+        // Not logged in - redirect to login with quiz code
+        toast.info('Please login to continue');
+        navigate(`/login?redirect=/play&code=${quizCode}`);
+        return;
+      }
+
       // Backend API call to validate quiz code
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/quiz/access-by-code/${quizCode}`);
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/quiz/access-by-code/${quizCode}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       const result = await response.json();
       
       if (!response.ok) {
+        if (response.status === 401) {
+          // Token expired - redirect to login
+          localStorage.removeItem('token');
+          toast.info('Session expired. Please login again');
+          navigate(`/login?redirect=/play&code=${quizCode}`);
+          return;
+        }
         throw new Error(result.message || 'Invalid quiz code');
       }
       
