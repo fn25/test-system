@@ -32,23 +32,27 @@ const ResetPasswordPage = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Backend API call
-      // const response = await fetch('/api/auth/reset-password', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ 
-      //     token: token,
-      //     password: data.password 
-      //   })
-      // });
+      // Backend API call
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          token: token,
+          password: data.password 
+        })
+      });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to reset password');
+      }
       
       toast.success('Password reset successful!');
       navigate('/login');
     } catch (error) {
-      toast.error('Failed to reset password. Please try again.');
+      console.error('Reset password error:', error);
+      toast.error(error.message || 'Failed to reset password. Please try again.');
     } finally {
       setIsLoading(false);
     }

@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { 
-  Plus, Trash2, Image, Video, Save, X, Copy, Check,
-  AlertCircle, BookOpen, Clock, Award
+  Plus, Trash2, Save, X, Copy, Check,
+  AlertCircle, BookOpen, Clock, Award, PlusCircle, MinusCircle
 } from 'lucide-react';
+import ImageUpload from './ImageUpload';
 
 const CreateQuizPage = () => {
   const [quizCode, setQuizCode] = useState('');
@@ -18,6 +19,7 @@ const CreateQuizPage = () => {
     handleSubmit,
     control,
     watch,
+    setValue,
     formState: { errors }
   } = useForm({
     defaultValues: {
@@ -30,7 +32,7 @@ const CreateQuizPage = () => {
         {
           text: '',
           type: 'multiple-choice',
-          options: ['', '', '', ''],
+          options: ['', ''], // Start with 2 options
           correctAnswer: 0,
           imageUrl: '',
           videoUrl: ''
@@ -43,6 +45,41 @@ const CreateQuizPage = () => {
     control,
     name: 'questions'
   });
+
+  // Add option to a question
+  const addOption = (questionIndex) => {
+    const currentOptions = watch(`questions.${questionIndex}.options`) || [];
+    if (currentOptions.length >= 6) {
+      toast.error('Maximum 6 options allowed');
+      return;
+    }
+    setValue(`questions.${questionIndex}.options`, [...currentOptions, '']);
+    toast.success('Option added');
+  };
+
+  // Remove option from a question
+  const removeOption = (questionIndex, optionIndex) => {
+    const currentOptions = watch(`questions.${questionIndex}.options`) || [];
+    if (currentOptions.length <= 2) {
+      toast.error('Minimum 2 options required');
+      return;
+    }
+    
+    const correctAnswer = watch(`questions.${questionIndex}.correctAnswer`);
+    const newOptions = currentOptions.filter((_, idx) => idx !== optionIndex);
+    
+    setValue(`questions.${questionIndex}.options`, newOptions);
+    
+    // Adjust correct answer if needed
+    if (correctAnswer === optionIndex) {
+      setValue(`questions.${questionIndex}.correctAnswer`, 0);
+      toast.info('Correct answer reset to first option');
+    } else if (correctAnswer > optionIndex) {
+      setValue(`questions.${questionIndex}.correctAnswer`, correctAnswer - 1);
+    }
+    
+    toast.success('Option removed');
+  };
 
   // Generate random quiz code
   const generateQuizCode = () => {
@@ -72,23 +109,27 @@ const CreateQuizPage = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Backend API call
-      // const response = await fetch('/api/quiz/create', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ ...data, quizCode })
-      // });
+      // Backend API call
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/quiz`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ ...data, quizCode })
+      });
       
-      console.log('Quiz Data:', { ...data, quizCode });
+      const result = await response.json();
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to create quiz');
+      }
       
       toast.success('Quiz created successfully!');
       navigate('/admin/quizzes');
     } catch (error) {
       console.error('Error creating quiz:', error);
-      toast.error('Failed to create quiz. Please try again.');
+      toast.error(error.message || 'Failed to create quiz. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -227,21 +268,6 @@ const CreateQuizPage = () => {
             <h2 className="card-title" style={{ marginBottom: 0 }}>
               Questions ({fields.length})
             </h2>
-            <button
-              type="button"
-              onClick={() => append({
-                text: '',
-                type: 'multiple-choice',
-                options: ['', '', '', ''],
-                correctAnswer: 0,
-                imageUrl: '',
-                videoUrl: ''
-              })}
-              className="btn btn-primary"
-            >
-              <Plus size={20} />
-              Add Question
-            </button>
           </div>
 
           {fields.length === 0 && (
@@ -293,37 +319,50 @@ const CreateQuizPage = () => {
                   )}
                 </div>
 
-                {/* Media URLs */}
+                {/* Media Upload/URL */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">
-                      <Image size={16} /> Image URL (optional)
-                    </label>
-                    <input
-                      type="url"
-                      className="form-control"
-                      placeholder="https://example.com/image.jpg"
-                      {...register(`questions.${questionIndex}.imageUrl`)}
-                    />
-                  </div>
+                  <ImageUpload
+                    label="Question Image"
+                    type="image"
+                    value={watch(`questions.${questionIndex}.imageUrl`) || ''}
+                    onChange={(url) => setValue(`questions.${questionIndex}.imageUrl`, url)}
+                  />
 
-                  <div className="form-group">
-                    <label className="form-label">
-                      <Video size={16} /> Video URL (optional)
-                    </label>
-                    <input
-                      type="url"
-                      className="form-control"
-                      placeholder="https://youtube.com/watch?v=..."
-                      {...register(`questions.${questionIndex}.videoUrl`)}
-                    />
-                  </div>
+                  <ImageUpload
+                    label="Question Video"
+                    type="video"
+                    value={watch(`questions.${questionIndex}.videoUrl`) || ''}
+                    onChange={(url) => setValue(`questions.${questionIndex}.videoUrl`, url)}
+                  />
                 </div>
 
                 {/* Answer Options */}
                 <div>
-                  <label className="form-label">Answer Options *</label>
-                  {[0, 1, 2, 3].map((optionIndex) => (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+                    <label className="form-label" style={{ marginBottom: 0 }}>
+                      Answer Options * ({watch(`questions.${questionIndex}.options`)?.length || 0}/6)
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => addOption(questionIndex)}
+                      disabled={watch(`questions.${questionIndex}.options`)?.length >= 6}
+                      className="btn btn-sm"
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: watch(`questions.${questionIndex}.options`)?.length >= 6 ? '#e5e7eb' : '#10b981',
+                        color: watch(`questions.${questionIndex}.options`)?.length >= 6 ? '#9ca3af' : 'white',
+                        border: 'none',
+                        cursor: watch(`questions.${questionIndex}.options`)?.length >= 6 ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                      }}
+                    >
+                      <PlusCircle size={16} />
+                      Add Option
+                    </button>
+                  </div>
+                  {watch(`questions.${questionIndex}.options`)?.map((_, optionIndex) => (
                     <div 
                       key={optionIndex}
                       style={{ 
@@ -337,9 +376,10 @@ const CreateQuizPage = () => {
                         type="radio"
                         value={optionIndex}
                         {...register(`questions.${questionIndex}.correctAnswer`, {
-                          required: true
+                          required: true,
+                          valueAsNumber: true
                         })}
-                        style={{ width: '20px', height: '20px' }}
+                        style={{ width: '20px', height: '20px', flexShrink: 0 }}
                       />
                       <input
                         type="text"
@@ -350,15 +390,59 @@ const CreateQuizPage = () => {
                         })}
                         style={{ flex: 1 }}
                       />
+                      {watch(`questions.${questionIndex}.options`)?.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => removeOption(questionIndex, optionIndex)}
+                          className="btn btn-sm"
+                          style={{
+                            padding: '0.5rem',
+                            background: '#ef4444',
+                            color: 'white',
+                            border: 'none',
+                            cursor: 'pointer',
+                            flexShrink: 0
+                          }}
+                          title="Remove option"
+                        >
+                          <MinusCircle size={16} />
+                        </button>
+                      )}
                     </div>
                   ))}
                   <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
-                    Select the radio button next to the correct answer
+                    ✓ Select the radio button next to the correct answer<br/>
+                    ✓ Add 2-6 options using the "Add Option" button<br/>
+                    ✓ Remove any option (except when only 2 remain)
                   </p>
                 </div>
               </div>
             </div>
           ))}
+
+          {/* Add Question Button - At the bottom */}
+          <button
+            type="button"
+            onClick={() => {
+              append({
+                text: '',
+                type: 'multiple-choice',
+                options: ['', ''], // Start with 2 options
+                correctAnswer: 0,
+                imageUrl: '',
+                videoUrl: ''
+              });
+              // Scroll to bottom after adding
+              setTimeout(() => {
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+              }, 100);
+            }}
+            className="btn btn-primary"
+            style={{ width: '100%', marginTop: fields.length > 0 ? '1rem' : '0' }}
+          >
+            <Plus size={20} />
+            Add Question
+          </button>
         </div>
 
         {/* Submit Buttons */}

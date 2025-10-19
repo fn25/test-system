@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { 
   Settings, BookOpen, Users, BarChart3, Plus, Edit2, Trash2, 
-  Search, Eye, CheckCircle, XCircle, Trophy, Calendar
+  Search, Eye, CheckCircle, XCircle, Trophy, Calendar, Lock, Unlock
 } from 'lucide-react';
 import { quizAPI, resultAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
@@ -204,7 +204,8 @@ const QuizManagement = () => {
   const fetchQuizzes = async () => {
     try {
       setIsLoading(true);
-      const response = await quizAPI.getQuizzes({ limit: 100 });
+      // Use getMyQuizzes to only show admin's own quizzes
+      const response = await quizAPI.getMyQuizzes({ limit: 100 });
       setQuizzes(response.data.data.quizzes);
     } catch (error) {
       console.error('Error fetching quizzes:', error);
@@ -226,6 +227,17 @@ const QuizManagement = () => {
     } catch (error) {
       console.error('Error deleting quiz:', error);
       toast.error('Failed to delete quiz');
+    }
+  };
+
+  const handleTogglePrivacy = async (quiz) => {
+    try {
+      await quizAPI.togglePrivacy(quiz.id, !quiz.isPublic);
+      toast.success(`Quiz is now ${!quiz.isPublic ? 'public' : 'private'}`);
+      fetchQuizzes();
+    } catch (error) {
+      console.error('Error toggling privacy:', error);
+      toast.error('Failed to update quiz privacy');
     }
   };
 
@@ -275,6 +287,7 @@ const QuizManagement = () => {
                   <th>Title</th>
                   <th>Category</th>
                   <th>Questions</th>
+                  <th>Status</th>
                   <th>Duration</th>
                   <th>Created</th>
                   <th>Actions</th>
@@ -297,6 +310,29 @@ const QuizManagement = () => {
                       </span>
                     </td>
                     <td>{quiz.questionCount || 0}</td>
+                    <td>
+                      <button
+                        onClick={() => handleTogglePrivacy(quiz)}
+                        className={`px-3 py-1 rounded-full text-sm font-medium flex items-center gap-1 ${
+                          quiz.isPublic 
+                            ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                        title={`Click to make ${quiz.isPublic ? 'private' : 'public'}`}
+                      >
+                        {quiz.isPublic ? (
+                          <>
+                            <Unlock className="w-3 h-3" />
+                            Public
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="w-3 h-3" />
+                            Private
+                          </>
+                        )}
+                      </button>
+                    </td>
                     <td>{quiz.timeLimit ? `${quiz.timeLimit} min` : 'No limit'}</td>
                     <td>{new Date(quiz.createdAt).toLocaleDateString()}</td>
                     <td>

@@ -52,12 +52,14 @@ export const authAPI = {
 // Quiz API functions
 export const quizAPI = {
   getQuizzes: (params) => api.get('/quiz', { params }),
+  getMyQuizzes: (params) => api.get('/quiz/my-quizzes', { params }),
   getQuiz: (id, includeAnswers = false) => api.get(`/quiz/${id}`, { 
     params: { includeAnswers } 
   }),
   createQuiz: (data) => api.post('/quiz', data),
   updateQuiz: (id, data) => api.put(`/quiz/${id}`, data),
   deleteQuiz: (id) => api.delete(`/quiz/${id}`),
+  togglePrivacy: (id, isPublic) => api.patch(`/quiz/${id}/privacy`, { isPublic }),
   addQuestion: (quizId, data) => api.post(`/quiz/${quizId}/questions`, data),
   updateQuestion: (quizId, questionId, data) => 
     api.put(`/quiz/${quizId}/questions/${questionId}`, data),

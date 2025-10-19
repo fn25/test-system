@@ -22,20 +22,24 @@ const ForgotPasswordPage = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Backend API call
-      // const response = await fetch('/api/auth/forgot-password', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ email: data.email })
-      // });
+      // Backend API call
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: data.email })
+      });
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to send reset link');
+      }
       
       setEmailSent(true);
       toast.success('Password reset link sent to your email!');
     } catch (error) {
-      toast.error('Failed to send reset link. Please try again.');
+      console.error('Forgot password error:', error);
+      toast.error(error.message || 'Failed to send reset link. Please try again.');
     } finally {
       setIsLoading(false);
     }
