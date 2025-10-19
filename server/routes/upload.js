@@ -15,17 +15,16 @@ const storage = multer.memoryStorage();
 const upload = multer({
   storage,
   limits: {
-  fileSize: 10 * 1024 * 1024
+    fileSize: 10 * 1024 * 1024
   },
   fileFilter: (req, file, cb) => {
-  if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
     if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       cb(null, true);
     } else {
-  cb(new Error('Only image and video files are allowed'), false);
+      cb(new Error('Only image and video files are allowed'), false);
     }
   }
-}});
+});
 
 
 router.post('/image', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
@@ -38,8 +37,9 @@ router.post('/image', authenticateToken, requireAdmin, upload.single('image'), a
     }
 
     const result = await imagekit.upload({
-  file: req.file.buffer.toString('base64'),
-      fileName: req.file.originalname
+      file: req.file.buffer.toString('base64'),
+      fileName: req.file.originalname,
+      folder: '/quiz-app/images'
     });
 
     res.json({
@@ -47,7 +47,8 @@ router.post('/image', authenticateToken, requireAdmin, upload.single('image'), a
       message: 'Image uploaded successfully',
       data: {
         url: result.url,
-        fileId: result.fileId
+        fileId: result.fileId,
+        thumbnail: result.thumbnailUrl
       }
     });
   } catch (error) {
@@ -71,8 +72,9 @@ router.post('/video', authenticateToken, requireAdmin, upload.single('video'), a
     }
 
     const result = await imagekit.upload({
-  file: req.file.buffer.toString('base64'),
-      fileName: req.file.originalname
+      file: req.file.buffer.toString('base64'),
+      fileName: req.file.originalname,
+      folder: '/quiz-app/videos'
     });
 
     res.json({
@@ -80,7 +82,8 @@ router.post('/video', authenticateToken, requireAdmin, upload.single('video'), a
       message: 'Video uploaded successfully',
       data: {
         url: result.url,
-        fileId: result.fileId
+        fileId: result.fileId,
+        thumbnail: result.thumbnailUrl
       }
     });
   } catch (error) {
@@ -125,45 +128,29 @@ router.delete('/:fileId', authenticateToken, requireAdmin, async (req, res) => {
 router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { 
-      resource_type = 'image',
-      max_results = 50,
-      next_cursor 
+      limit = 50,
+      skip = 0 
     } = req.query;
 
-    const options = {
-      resource_type,
-  type: 'upload',
-  prefix: 'quiz-app/',
-  max_results: parseInt(max_results)
-    };
-
-    if (next_cursor) {
-      options.next_cursor = next_cursor;
-    }
-
-    const result = await cloudinary.search
-      .expression(`folder:quiz-app/${resource_type === 'video' ? 'videos' : 'images'}`)
-      .sort_by([['created_at', 'desc']])
-      .max_results(parseInt(max_results))
-      .execute();
+    const result = await imagekit.listFiles({
+      skip: parseInt(skip),
+      limit: parseInt(limit)
+    });
 
     res.json({
       success: true,
       message: 'Files retrieved successfully',
       data: {
-        resources: result.resources.map(resource => ({
-          publicId: resource.public_id,
-          url: resource.secure_url,
-          format: resource.format,
-          width: resource.width,
-          height: resource.height,
-          bytes: resource.bytes,
-          createdAt: resource.created_at,
-          resourceType: resource.resource_type
+        files: result.map(file => ({
+          fileId: file.fileId,
+          name: file.name,
+          url: file.url,
+          thumbnail: file.thumbnail,
+          fileType: file.fileType,
+          size: file.size,
+          createdAt: file.createdAt
         })),
-        totalCount: result.total_count,
-        hasMore: !!result.next_cursor,
-        nextCursor: result.next_cursor
+        totalCount: result.length
       }
     });
   } catch (error) {
