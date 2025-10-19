@@ -7,26 +7,23 @@ services:
     runtime: node
     plan: free
     branch: main
-    buildCommand: npm install --production
+    buildCommand: npm install
     startCommand: npm start
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
       - key: PORT
-        value: "10001"
+        value: "10000"
       - key: DATABASE_URL
-        value: "postgresql://neondb_owner:npg_mDle56rIjyat@ep-small-sun-adywycce-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+        sync: false
       - key: JWT_SECRET
-        value: "a46a32d07938ca1ade573dbfccfe253e29cfbf76092af8223327017370514d8eace56e6cc363d6"
+        sync: false
       - key: IMAGEKIT_PUBLIC_KEY
-        value: "public_/RQ7wDgI06wW6LhMZWzqITWrHz8="
+        sync: false
       - key: IMAGEKIT_PRIVATE_KEY
-        value: "private_2b0GeWBkCc0eMThbL6NaSyIKuhY="
+        sync: false
       - key: IMAGEKIT_URL_ENDPOINT
-        value: "https://ik.imagekit.io/your_imagekit_id"
-
-databases:
-  - name: testlash-tizmi-db
-    plan: starter
-    databaseName: testlash_tizmi
-    user: testlash_user
+        sync: false
+      - key: FRONTEND_ORIGIN
+        value: "https://your-app.vercel.app"
