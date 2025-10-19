@@ -3,8 +3,8 @@ import axios from 'axios';
 // Create axios instance with base configuration
 const api = axios.create({
   baseURL: process.env.NODE_ENV === 'production' 
-    ? 'https://test-system-1-yiph.onrender.com'  // Replace with your actual Render URL
-    : '/api',
+    ? 'https://testlash-tizmi.onrender.com/api'  // Replace with your actual Render URL
+    : 'http://localhost:10001/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json'

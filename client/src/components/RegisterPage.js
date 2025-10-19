@@ -152,6 +152,26 @@ const RegisterPage = () => {
             </div>
 
             <div className="form-group">
+              <label htmlFor="role" className="form-label">
+                Account Type
+              </label>
+              <select
+                id="role"
+                className={`form-control ${errors.role ? 'error' : ''}`}
+                {...register('role', {
+                  required: 'Please select account type'
+                })}
+              >
+                <option value="">Select account type</option>
+                <option value="user">Student (Take Quizzes)</option>
+                <option value="admin">Teacher/Admin (Create Quizzes)</option>
+              </select>
+              {errors.role && (
+                <p className="form-error">{errors.role.message}</p>
+              )}
+            </div>
+
+            <div className="form-group">
               <label htmlFor="password" className="form-label">
                 Password
               </label>
