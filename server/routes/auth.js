@@ -35,7 +35,11 @@ router.post('/register', [
   body('lastName')
     .optional()
     .isLength({ max: 50 })
-    .withMessage('Last name must be less than 50 characters')
+    .withMessage('Last name must be less than 50 characters'),
+  body('role')
+    .optional()
+    .isIn(['admin', 'user'])
+    .withMessage('Role must be either admin or user')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -47,7 +51,7 @@ router.post('/register', [
       });
     }
 
-    const { username, email, password, firstName, lastName } = req.body;
+    const { username, email, password, firstName, lastName, role } = req.body;
 
     const existingUser = await User.findOne({
       where: {
@@ -68,7 +72,7 @@ router.post('/register', [
       password,
       firstName,
       lastName,
-  role: 'user'
+      role: role || 'user'
     });
 
     const token = generateToken(user.id);

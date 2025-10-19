@@ -53,18 +53,28 @@ app.use('*', (req, res) => {
 
 const startServer = async () => {
   try {
+    console.log('🔄 Starting server...');
+    console.log('🔄 Connecting to database...');
     await sequelize.authenticate();
     console.log('✅ Database connection established successfully.');
 
-    await sequelize.sync({ alter: true });
-    console.log('✅ Database models synchronized.');
+    console.log('🔄 Synchronizing database models...');
+    try {
+      await sequelize.sync({ force: false });
+      console.log('✅ Database models synchronized.');
+    } catch (syncError) {
+      console.error('⚠️ Database sync warning:', syncError.message);
+      console.log('Continuing without sync...');
+    }
 
     app.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`📡 Health check: http://localhost:${PORT}/health`);
+      console.log(`📡 API Base: http://localhost:${PORT}/api`);
     });
   } catch (error) {
     console.error('❌ Unable to start server:', error);
+    console.error('Error details:', error.message);
     process.exit(1);
   }
 };
