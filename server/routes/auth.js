@@ -1,9 +1,11 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { body, validationResult } from 'express-validator';
 import { Op } from 'sequelize';
 import { User } from '../models/index.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { sendPasswordResetEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -299,6 +301,146 @@ router.post('/verify-token', authenticateToken, (req, res) => {
       user: req.user.toJSON()
     }
   });
+});
+
+// @route   POST /api/auth/forgot-password
+// @desc    Send password reset email
+// @access  Public
+router.post('/forgot-password', [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email')
+    .normalizeEmail()
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+    }
+
+    const { email } = req.body;
+    
+    // Find user by email
+    const user = await User.findOne({ where: { email } });
+    
+    // Always return success to prevent email enumeration attacks
+    if (!user) {
+      return res.json({
+        success: true,
+        message: 'If an account exists with that email, a password reset link has been sent'
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
+
+    // Save token to database
+    await user.update({
+      resetPasswordToken: resetToken,
+      resetPasswordExpires: resetTokenExpiry
+    });
+
+    // Send email
+    try {
+      await sendPasswordResetEmail(email, resetToken, user.username);
+      
+      console.log(`✅ Password reset email sent to ${email}`);
+      
+      res.json({
+        success: true,
+        message: 'If an account exists with that email, a password reset link has been sent'
+      });
+    } catch (emailError) {
+      console.error('Email send failed:', emailError);
+      
+      // Clear reset token if email fails
+      await user.update({
+        resetPasswordToken: null,
+        resetPasswordExpires: null
+      });
+      
+      // Return generic error to user
+      res.status(500).json({
+        success: false,
+        message: 'Failed to send password reset email. Please try again later.'
+      });
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'An error occurred. Please try again later.',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password with token
+// @access  Public
+router.post('/reset-password', [
+  body('token')
+    .notEmpty()
+    .withMessage('Reset token is required'),
+  body('password')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 6 characters long')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+    }
+
+    const { token, password } = req.body;
+    
+    // Find user with valid reset token
+    const user = await User.findOne({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: {
+          [Op.gt]: new Date() // Token not expired
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset token'
+      });
+    }
+
+    // Update password and clear reset token
+    await user.update({
+      password: password,
+      resetPasswordToken: null,
+      resetPasswordExpires: null
+    });
+
+    console.log(`✅ Password reset successful for user: ${user.username}`);
+
+    res.json({
+      success: true,
+      message: 'Password has been reset successfully. You can now log in with your new password.'
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
 });
 
 export default router;

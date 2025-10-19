@@ -9,6 +9,8 @@ import authRoutes from './routes/auth.js';
 import quizRoutes from './routes/quiz.js';
 import uploadRoutes from './routes/upload.js';
 import resultRoutes from './routes/result.js';
+import imagekitRoutes from './routes/imagekit.js';
+import { verifyEmailConfig } from './services/emailService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,7 +55,8 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       quiz: '/api/quiz',
       upload: '/api/upload',
-      result: '/api/result'
+      result: '/api/result',
+      imagekit: '/api/imagekit'
     }
   });
 });
@@ -68,6 +71,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/quiz', quizRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/result', resultRoutes);
+app.use('/api/imagekit', imagekitRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -101,6 +105,14 @@ const startServer = async () => {
     } catch (syncError) {
       console.error('⚠️ Database sync warning:', syncError.message);
       console.log('Continuing without sync...');
+    }
+
+    // Verify email service
+    console.log('🔄 Checking email service...');
+    const emailReady = await verifyEmailConfig();
+    if (!emailReady) {
+      console.log('⚠️ Email service not configured. Password reset will not work.');
+      console.log('💡 Add EMAIL_* variables to .env to enable email features.');
     }
 
     app.listen(PORT, () => {

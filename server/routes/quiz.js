@@ -87,6 +87,130 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
+// @route   GET /api/quiz/my-quizzes
+// @desc    Get quizzes created by current user (admin)
+// @access  Private (Admin only)
+router.get('/my-quizzes', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      limit = 100,
+      search
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const where = { createdBy: req.user.id };
+
+    if (search) {
+      where[Op.or] = [
+        { title: { [Op.iLike]: `%${search}%` } },
+        { description: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    const { count, rows: quizzes } = await Quiz.findAndCountAll({
+      where,
+      include: [
+        {
+          model: Question,
+          as: 'questions',
+          attributes: ['id'],
+          required: false
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: parseInt(offset)
+    });
+
+    const quizzesWithCounts = quizzes.map(quiz => {
+      const quizData = quiz.toJSON();
+      quizData.questionCount = quiz.questions.length;
+      delete quizData.questions;
+      return quizData;
+    });
+
+    res.json({
+      success: true,
+      message: 'Your quizzes retrieved successfully',
+      data: {
+        quizzes: quizzesWithCounts,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(count / limit),
+          totalItems: count,
+          itemsPerPage: parseInt(limit)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Get my quizzes error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve your quizzes',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// @route   GET /api/quiz/access-by-code/:code
+// @desc    Access quiz by code (for guest users)
+// @access  Public
+router.get('/access-by-code/:code', [
+  param('code')
+    .isLength({ min: 6, max: 10 })
+    .withMessage('Quiz code must be between 6 and 10 characters')
+    .isAlphanumeric()
+    .withMessage('Quiz code must be alphanumeric')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+    }
+
+    const { code } = req.params;
+    
+    const quiz = await Quiz.findOne({
+      where: { 
+        quizCode: code.toUpperCase(),
+        isActive: true
+      },
+      include: [
+        {
+          model: Question,
+          as: 'questions',
+          attributes: { exclude: ['correctAnswer', 'explanation'] }
+        }
+      ]
+    });
+
+    if (!quiz) {
+      return res.status(404).json({
+        success: false,
+        message: 'Quiz not found with this code'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Quiz found',
+      data: { quiz }
+    });
+  } catch (error) {
+    console.error('Access by code error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to access quiz',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
 
 router.get('/:id', authenticateToken, [
   param('id').isUUID().withMessage('Invalid quiz ID')
@@ -270,6 +394,8 @@ router.put('/:id', authenticateToken, requireAdmin, [
     }
 
     const { id } = req.params;
+    const { questions, ...quizData } = req.body;
+    
     const quiz = await Quiz.findByPk(id);
 
     if (!quiz) {
@@ -279,7 +405,46 @@ router.put('/:id', authenticateToken, requireAdmin, [
       });
     }
 
-    await quiz.update(req.body);
+    // Update quiz basic info
+    await quiz.update(quizData);
+
+    // Update questions if provided
+    if (questions && Array.isArray(questions)) {
+      // Get existing questions
+      const existingQuestions = await Question.findAll({
+        where: { quizId: id }
+      });
+
+      const existingQuestionIds = existingQuestions.map(q => q.id);
+      const updatedQuestionIds = questions.filter(q => q.id).map(q => q.id);
+
+      // Delete questions that are no longer in the list
+      const questionsToDelete = existingQuestionIds.filter(
+        qId => !updatedQuestionIds.includes(qId)
+      );
+      
+      if (questionsToDelete.length > 0) {
+        await Question.destroy({
+          where: { id: questionsToDelete }
+        });
+      }
+
+      // Update or create questions
+      for (const questionData of questions) {
+        if (questionData.id) {
+          // Update existing question
+          await Question.update(questionData, {
+            where: { id: questionData.id, quizId: id }
+          });
+        } else {
+          // Create new question
+          await Question.create({
+            ...questionData,
+            quizId: id
+          });
+        }
+      }
+    }
 
     const updatedQuiz = await Quiz.findByPk(quiz.id, {
       include: [
@@ -287,6 +452,10 @@ router.put('/:id', authenticateToken, requireAdmin, [
           model: User,
           as: 'creator',
           attributes: ['id', 'username', 'firstName', 'lastName']
+        },
+        {
+          model: Question,
+          as: 'questions'
         }
       ]
     });
@@ -526,6 +695,66 @@ router.delete('/:quizId/questions/:questionId', authenticateToken, requireAdmin,
     res.status(500).json({
       success: false,
       message: 'Failed to delete question',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+// @route   PATCH /api/quiz/:id/privacy
+// @desc    Toggle quiz privacy (public/private)
+// @access  Private (Admin/Creator only)
+router.patch('/:id/privacy', authenticateToken, requireAdmin, [
+  param('id').isUUID().withMessage('Invalid quiz ID'),
+  body('isPublic').isBoolean().withMessage('isPublic must be a boolean')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array()
+      });
+    }
+
+    const { id } = req.params;
+    const { isPublic } = req.body;
+
+    const quiz = await Quiz.findByPk(id);
+
+    if (!quiz) {
+      return res.status(404).json({
+        success: false,
+        message: 'Quiz not found'
+      });
+    }
+
+    // Check if user is creator or admin
+    if (quiz.createdBy !== req.user.id && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied. You can only modify your own quizzes.'
+      });
+    }
+
+    await quiz.update({ isPublic });
+
+    res.json({
+      success: true,
+      message: `Quiz is now ${isPublic ? 'public' : 'private'}`,
+      data: { 
+        quiz: {
+          id: quiz.id,
+          title: quiz.title,
+          isPublic: quiz.isPublic
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Toggle privacy error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update quiz privacy',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }

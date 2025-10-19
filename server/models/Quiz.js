@@ -56,6 +56,27 @@ export default (sequelize) => {
       defaultValue: false,
       comment: 'Whether the quiz is publicly accessible'
     },
+    isLive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: 'Whether the quiz is currently live/active for participants'
+    },
+    startMode: {
+      type: DataTypes.ENUM('auto', 'manual'),
+      defaultValue: 'auto',
+      comment: 'Auto: starts immediately when participant joins, Manual: waits for admin to start'
+    },
+    quizCode: {
+      type: DataTypes.STRING(8),
+      allowNull: true,
+      unique: true,
+      validate: {
+        len: [6, 8],
+        isUppercase: true,
+        isAlphanumeric: true
+      },
+      comment: 'Unique code for guest access to quiz'
+    },
     showCorrectAnswers: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
@@ -97,6 +118,10 @@ export default (sequelize) => {
       },
       {
         fields: ['isPublic']
+      },
+      {
+        fields: ['quizCode'],
+        unique: true
       },
       {
         fields: ['category']

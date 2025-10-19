@@ -56,6 +56,14 @@ export default (sequelize) => {
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true
+    },
+    resetPasswordToken: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    resetPasswordExpires: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
     timestamps: true,
@@ -83,6 +91,8 @@ export default (sequelize) => {
   User.prototype.toJSON = function() {
     const values = { ...this.get() };
     delete values.password;
+    delete values.resetPasswordToken;
+    delete values.resetPasswordExpires;
     return values;
   };
 
