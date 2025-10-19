@@ -1,0 +1,34 @@
+# Render deployment configuration
+version: "1"
+
+services:
+  - type: web
+    name: testlash-tizmi-backend
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: cd server && npm install --production
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: testlash-tizmi-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CLOUD_NAME
+        value: ""
+      - key: API_KEY
+        value: ""
+      - key: API_SECRET
+        value: ""
+
+databases:
+  - name: testlash-tizmi-db
+    plan: starter
+    databaseName: testlash_tizmi
+    user: testlash_user
