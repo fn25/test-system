@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { 
   Settings, BookOpen, Users, BarChart3, Plus, Edit2, Trash2, 
-  Search, Eye, CheckCircle, XCircle, Trophy, Calendar, Lock, Unlock
+  Search, Eye, CheckCircle, XCircle, Trophy, Calendar, Lock, Unlock, Monitor
 } from 'lucide-react';
 import { quizAPI, resultAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
 import CreateQuizPage from './CreateQuizPage';
+import EditQuizPage from './EditQuizPage';
+import HostLivePage from './HostLivePage';
 
 const AdminDashboard = () => {
   const location = useLocation();
@@ -69,6 +71,8 @@ const AdminDashboard = () => {
         <Route path="/" element={<AdminOverview />} />
         <Route path="/quizzes" element={<QuizManagement />} />
         <Route path="/quizzes/create" element={<CreateQuizPage />} />
+        <Route path="/quizzes/edit/:id" element={<EditQuizPage />} />
+        <Route path="/quizzes/host/:id" element={<HostLivePage />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/results" element={<ResultsManagement />} />
         <Route path="*" element={<Navigate to="/admin" replace />} />
@@ -337,12 +341,20 @@ const QuizManagement = () => {
                     <td>{new Date(quiz.createdAt).toLocaleDateString()}</td>
                     <td>
                       <div className="flex gap-2">
-                        <button className="btn btn-sm btn-outline" title="View">
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button className="btn btn-sm btn-outline" title="Edit">
+                        <Link 
+                          to={`/admin/quizzes/host/${quiz.id}`}
+                          className="btn btn-sm btn-primary" 
+                          title="Host Live"
+                        >
+                          <Monitor className="w-4 h-4" />
+                        </Link>
+                        <Link 
+                          to={`/admin/quizzes/edit/${quiz.id}`}
+                          className="btn btn-sm btn-outline" 
+                          title="Edit"
+                        >
                           <Edit2 className="w-4 h-4" />
-                        </button>
+                        </Link>
                         <button 
                           className="btn btn-sm btn-danger"
                           onClick={() => handleDelete(quiz.id)}

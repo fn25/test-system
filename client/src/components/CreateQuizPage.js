@@ -28,6 +28,7 @@ const CreateQuizPage = () => {
       category: '',
       timeLimit: '',
       passingScore: 70,
+      startMode: 'auto',
       questions: [
         {
           text: '',
@@ -257,6 +258,22 @@ const CreateQuizPage = () => {
                   placeholder="70"
                   {...register('passingScore', { min: 0, max: 100 })}
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Start Mode
+                </label>
+                <select
+                  className="form-control"
+                  {...register('startMode')}
+                >
+                  <option value="auto">Auto - Start immediately when participant joins</option>
+                  <option value="manual">Manual - Admin starts the quiz</option>
+                </select>
+                <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+                  Choose how participants can start taking the quiz
+                </p>
               </div>
             </div>
           </div>

@@ -20,28 +20,23 @@ const GuestAccessPage = () => {
     setIsLoading(true);
     
     try {
-      // TODO: Backend API call to validate quiz code
-      // const response = await fetch(`/api/quiz/access-by-code/${quizCode}`, {
-      //   method: 'GET',
-      //   headers: { 'Content-Type': 'application/json' }
-      // });
+      // Backend API call to validate quiz code
+      const response = await fetch(`${process.env.REACT_APP_API_URL}/quiz/access-by-code/${quizCode}`);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const result = await response.json();
       
-      // Mock: Check if code exists (for demo)
-      const mockValidCode = 'QUIZ123'; // Demo code
-      
-      if (quizCode.toUpperCase() === mockValidCode) {
-        toast.success('Quiz found! Starting...');
-        // Navigate to quiz (mock quiz ID: 1)
-        navigate('/quiz/1');
-      } else {
-        toast.error('Invalid quiz code. Please check and try again.');
+      if (!response.ok) {
+        throw new Error(result.message || 'Invalid quiz code');
       }
+      
+      const quiz = result.data.quiz;
+      
+      toast.success(`Quiz found: ${quiz.title}`);
+      // Navigate to quiz
+      navigate(`/quiz/${quiz.id}`);
     } catch (error) {
       console.error('Error accessing quiz:', error);
-      toast.error('Failed to access quiz. Please try again.');
+      toast.error(error.message || 'Invalid quiz code. Please check and try again.');
     } finally {
       setIsLoading(false);
     }

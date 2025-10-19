@@ -56,6 +56,7 @@ export const quizAPI = {
   getQuiz: (id, includeAnswers = false) => api.get(`/quiz/${id}`, { 
     params: { includeAnswers } 
   }),
+  getQuizById: (id) => api.get(`/quiz/${id}`),
   createQuiz: (data) => api.post('/quiz', data),
   updateQuiz: (id, data) => api.put(`/quiz/${id}`, data),
   deleteQuiz: (id) => api.delete(`/quiz/${id}`),

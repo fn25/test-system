@@ -41,24 +41,47 @@ export const uploadToImageKit = async (file, folder = 'quiz-media', onProgress =
     formData.append('fileName', file.name);
     formData.append('folder', folder);
 
-    // Upload to ImageKit
-    const uploadResponse = await fetch(`${urlEndpoint}/api/v1/files/upload`, {
-      method: 'POST',
-      body: formData,
-      onUploadProgress: (progressEvent) => {
-        if (onProgress) {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          onProgress(percentCompleted);
-        }
+    // Upload using XMLHttpRequest for progress tracking
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      // Track upload progress
+      if (onProgress) {
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const percentCompleted = Math.round((event.loaded * 100) / event.total);
+            onProgress(percentCompleted);
+          }
+        });
       }
+
+      // Handle completion
+      xhr.addEventListener('load', () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            resolve(result.url);
+          } catch (error) {
+            reject(new Error('Failed to parse upload response'));
+          }
+        } else {
+          reject(new Error(`Upload failed with status ${xhr.status}`));
+        }
+      });
+
+      // Handle errors
+      xhr.addEventListener('error', () => {
+        reject(new Error('Network error during upload'));
+      });
+
+      xhr.addEventListener('abort', () => {
+        reject(new Error('Upload aborted'));
+      });
+
+      // Send request
+      xhr.open('POST', `https://upload.imagekit.io/api/v1/files/upload`);
+      xhr.send(formData);
     });
-
-    if (!uploadResponse.ok) {
-      throw new Error('Failed to upload file to ImageKit');
-    }
-
-    const result = await uploadResponse.json();
-    return result.url;
 
   } catch (error) {
     console.error('ImageKit upload error:', error);
