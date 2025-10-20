@@ -24,7 +24,7 @@ const PORT = process.env.PORT || 10000;
 // CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://your-app.vercel.app',
+  'https://test-system-m83sglvo8-sardors-projects-0bb5ea52.vercel.app',
   process.env.FRONTEND_ORIGIN
 ].filter(Boolean);
 
