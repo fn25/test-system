@@ -53,7 +53,7 @@ export default (sequelize) => {
     },
     isPublic: {
       type: DataTypes.BOOLEAN,
-      defaultValue: false,
+      defaultValue: true,
       comment: 'Whether the quiz is publicly accessible'
     },
     isLive: {
