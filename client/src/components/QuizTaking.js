@@ -37,11 +37,29 @@ const QuizTaking = () => {
 
   const fetchQuiz = async () => {
     try {
+      console.log('🔄 Fetching quiz with ID:', id);
       const response = await quizAPI.getQuiz(id);
-      setQuiz(response.data.data.quiz);
+      console.log('✅ Quiz response:', response);
+      
+      if (response.data && response.data.data && response.data.data.quiz) {
+        setQuiz(response.data.data.quiz);
+        console.log('✅ Quiz loaded:', response.data.data.quiz.title);
+      } else {
+        console.error('❌ Invalid response structure:', response);
+        throw new Error('Invalid quiz data structure');
+      }
     } catch (error) {
-      console.error('Error fetching quiz:', error);
-      toast.error('Failed to load quiz');
+      console.error('❌ Error fetching quiz:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      
+      if (error.response?.status === 404) {
+        toast.error('Quiz not found');
+      } else if (error.response?.status === 403) {
+        toast.error('You do not have access to this quiz');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to load quiz');
+      }
+      
       navigate('/quizzes');
     } finally {
       setLoading(false);
