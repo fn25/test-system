@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { Play, Hash, ArrowRight } from 'lucide-react';
+import { getApiUrl } from '../config/api.config';
 import '../styles/auth.css';
 
 const GuestAccessPage = () => {
@@ -41,7 +42,7 @@ const GuestAccessPage = () => {
       }
 
       // Backend API call to validate quiz code
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/quiz/access-by-code/${quizCode}`, {
+      const response = await fetch(`${getApiUrl()}/quiz/access-by-code/${quizCode}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

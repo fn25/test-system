@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-hot-toast';
 import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { getApiUrl } from '../config/api.config';
 import '../styles/auth.css';
 
 const ForgotPasswordPage = () => {
@@ -23,7 +24,7 @@ const ForgotPasswordPage = () => {
     
     try {
       // Backend API call
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/auth/forgot-password`, {
+      const response = await fetch(`${getApiUrl()}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: data.email })

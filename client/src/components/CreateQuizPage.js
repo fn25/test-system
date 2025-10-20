@@ -6,6 +6,7 @@ import {
   Plus, Trash2, Save, X, Copy, Check,
   AlertCircle, BookOpen, Clock, Award, PlusCircle, MinusCircle
 } from 'lucide-react';
+import { getApiUrl } from '../config/api.config';
 import ImageUpload from './ImageUpload';
 
 const CreateQuizPage = () => {
@@ -111,7 +112,7 @@ const CreateQuizPage = () => {
     
     try {
       // Backend API call
-      const response = await fetch(`${process.env.REACT_APP_API_URL}/quiz`, {
+      const response = await fetch(`${getApiUrl()}/quiz`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',

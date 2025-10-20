@@ -1,12 +1,11 @@
 import axios from 'axios';
+import { API_CONFIG } from '../config/api.config';
 
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:10001/api',
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  baseURL: API_CONFIG.baseURL,
+  timeout: API_CONFIG.timeout,
+  headers: API_CONFIG.headers
 });
 
 // Request interceptor to add auth token

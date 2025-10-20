@@ -5,6 +5,7 @@ import {
   RefreshCw, Eye, Clock 
 } from 'lucide-react';
 import { quizAPI } from '../services/api';
+import { getApiUrl } from '../config/api.config';
 import { toast } from 'react-hot-toast';
 import LoadingSpinner from './LoadingSpinner';
 
@@ -47,7 +48,7 @@ const HostLivePage = () => {
     try {
       // This endpoint will be created in backend
       const response = await fetch(
-        `${process.env.REACT_APP_API_URL}/quiz/${id}/participants`,
+        `${getApiUrl()}/quiz/${id}/participants`,
         {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`
