@@ -21,7 +21,6 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// CORS configuration
 const allowedOrigins = [
   'http://localhost:3000',
   'https://test-system-m83sglvo8-sardors-projects-0bb5ea52.vercel.app',
@@ -30,26 +29,10 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
-    // Check if origin is in allowed list
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      return callback(null, true);
-    }
-    
-    // Allow all Vercel preview/production domains
-    if (origin && (origin.endsWith('.vercel.app') || origin.endsWith('.vercel.com'))) {
-      return callback(null, true);
-    }
-    
-    // Allow in development
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    
-    // Log rejected origin for debugging
-    console.log('❌ CORS blocked origin:', origin);
+    if (allowedOrigins.indexOf(origin) !== -1) return callback(null, true);
+    if (origin && (origin.endsWith('.vercel.app') || origin.endsWith('.vercel.com'))) return callback(null, true);
+    if (process.env.NODE_ENV === 'development') return callback(null, true);
     callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -144,83 +127,74 @@ const runMigrations = async () => {
     // Run each migration that hasn't been executed yet
     for (const file of migrationFiles) {
       if (executedNames.includes(file)) {
-        console.log(`⏭️  Skipping ${file} (already executed)`);
+        console.log(`Skipping ${file} (already executed)`);
         continue;
       }
 
-      console.log(`🔄 Running migration: ${file}`);
+      console.log(`Running migration: ${file}`);
       
       try {
         const migrationPath = path.join(migrationsDir, file);
         const migration = await import(`file://${migrationPath}`);
-        
-        // Create QueryInterface instance
         const queryInterface = sequelize.getQueryInterface();
-        
-        // Run the migration
         await migration.up(queryInterface, Sequelize);
-        
-        // Record the migration as executed
         await sequelize.query(
           'INSERT INTO "SequelizeMeta" (name) VALUES (?)',
           { replacements: [file] }
         );
-        
-        console.log(`✅ Migration ${file} completed successfully`);
+        console.log(`Migration ${file} completed successfully`);
       } catch (migrationError) {
-        console.error(`❌ Error running migration ${file}:`, migrationError.message);
+        console.error(`Error running migration ${file}:`, migrationError.message);
         throw migrationError;
       }
     }
 
-    console.log('✅ All migrations completed successfully');
+    console.log('All migrations completed successfully');
   } catch (error) {
-    console.error('❌ Migration error:', error.message);
+    console.error('Migration error:', error.message);
     throw error;
   }
 };
 
 const startServer = async () => {
   try {
-    console.log('🔄 Starting server...');
-    console.log('🔄 Connecting to database...');
+    console.log('Starting server...');
+    console.log('Connecting to database...');
     await sequelize.authenticate();
-    console.log('✅ Database connection established successfully.');
+    console.log('Database connection established.');
 
-    console.log('🔄 Running database migrations...');
+    console.log('Running database migrations...');
     try {
-      // Run migrations programmatically
       await runMigrations();
-      console.log('✅ Database migrations completed.');
+      console.log('Database migrations completed.');
     } catch (migrationError) {
-      console.error('⚠️ Migration warning:', migrationError.message);
+      console.error('Migration warning:', migrationError.message);
       console.log('Continuing without migrations...');
     }
 
-    console.log('🔄 Synchronizing database models...');
+    console.log('Synchronizing database models...');
     try {
       await sequelize.sync({ alter: false });
-      console.log('✅ Database models synchronized.');
+      console.log('Database models synchronized.');
     } catch (syncError) {
-      console.error('⚠️ Database sync warning:', syncError.message);
+      console.error('Database sync warning:', syncError.message);
       console.log('Continuing without sync...');
     }
 
-    // Verify email service
-    console.log('🔄 Checking email service...');
+    console.log('Checking email service...');
     const emailReady = await verifyEmailConfig();
     if (!emailReady) {
-      console.log('⚠️ Email service not configured. Password reset will not work.');
-      console.log('💡 Add EMAIL_* variables to .env to enable email features.');
+      console.log('Email service not configured. Password reset will not work.');
+      console.log('Add EMAIL_* variables to .env to enable email features.');
     }
 
     app.listen(PORT, () => {
-      console.log(`🚀 Server is running on port ${PORT}`);
-      console.log(`📡 Health check: http://localhost:${PORT}/health`);
-      console.log(`📡 API Base: http://localhost:${PORT}/api`);
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+      console.log(`API Base: http://localhost:${PORT}/api`);
     });
   } catch (error) {
-    console.error('❌ Unable to start server:', error);
+    console.error('Unable to start server:', error);
     console.error('Error details:', error.message);
     process.exit(1);
   }
