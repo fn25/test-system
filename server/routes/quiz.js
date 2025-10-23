@@ -322,15 +322,23 @@ router.post('/', authenticateToken, requireAdmin, [
     const { questions, ...quizData } = req.body;
     quizData.createdBy = req.user.id;
 
+    console.log('📥 Received quiz data:', { ...quizData, questionsCount: questions?.length || 0 });
+    console.log('📊 Questions:', JSON.stringify(questions, null, 2));
+
     const quiz = await Quiz.create(quizData);
+    console.log('✅ Quiz created with ID:', quiz.id);
 
     if (questions && Array.isArray(questions) && questions.length > 0) {
+      console.log(`📝 Creating ${questions.length} questions...`);
       for (const questionData of questions) {
-        await Question.create({
+        const createdQuestion = await Question.create({
           ...questionData,
           quizId: quiz.id
         });
+        console.log(`✅ Question created with ID: ${createdQuestion.id}`);
       }
+    } else {
+      console.log('⚠️ No questions provided or questions is not an array');
     }
 
     const createdQuiz = await Quiz.findByPk(quiz.id, {
@@ -346,6 +354,8 @@ router.post('/', authenticateToken, requireAdmin, [
         }
       ]
     });
+
+    console.log(`✅ Quiz retrieved with ${createdQuiz.questions.length} questions`);
 
     res.status(201).json({
       success: true,

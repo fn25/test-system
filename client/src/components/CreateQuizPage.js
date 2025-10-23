@@ -107,6 +107,10 @@ const CreateQuizPage = () => {
       return;
     }
 
+    console.log('📤 Submitting quiz data:', { ...data, quizCode });
+    console.log('📊 Questions count:', data.questions?.length || 0);
+    console.log('📝 Questions data:', JSON.stringify(data.questions, null, 2));
+
     setIsLoading(true);
     
     try {
@@ -122,6 +126,8 @@ const CreateQuizPage = () => {
       
       const result = await response.json();
       
+      console.log('📥 Server response:', result);
+      
       if (!response.ok) {
         throw new Error(result.message || 'Failed to create quiz');
       }
@@ -129,7 +135,7 @@ const CreateQuizPage = () => {
       toast.success('Quiz created successfully!');
       navigate('/admin/quizzes');
     } catch (error) {
-      console.error('Error creating quiz:', error);
+      console.error('❌ Error creating quiz:', error);
       toast.error(error.message || 'Failed to create quiz. Please try again.');
     } finally {
       setIsLoading(false);
