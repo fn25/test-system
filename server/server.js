@@ -181,17 +181,14 @@ const startServer = async () => {
       console.log('Continuing without sync...');
     }
 
-    console.log('Checking email service...');
-    const emailReady = await verifyEmailConfig();
-    if (!emailReady) {
-      console.log('Email service not configured. Password reset will not work.');
-      console.log('Add EMAIL_* variables to .env to enable email features.');
-    }
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `https://test-system-m678.onrender.com`;
 
     app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-      console.log(`Health check: http://localhost:${PORT}/health`);
-      console.log(`API Base: http://localhost:${PORT}/api`);
+      console.log(`✅ Server is running on port ${PORT}`);
+      if (process.env.NODE_ENV === 'production') {
+        console.log(`🌐 API URL: ${baseUrl}`);
+        console.log(`🎨 Frontend: ${process.env.FRONTEND_ORIGIN || 'https://test-system-mu.vercel.app'}`);
+      }
     });
   } catch (error) {
     console.error('Unable to start server:', error);

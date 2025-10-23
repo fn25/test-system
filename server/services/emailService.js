@@ -14,9 +14,7 @@ import nodemailer from 'nodemailer';
 
 // Create reusable transporter
 const createTransporter = () => {
-  // Check if email is configured
   if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.warn('⚠️ Email service not configured. Set EMAIL_HOST, EMAIL_USER, and EMAIL_PASS in .env');
     return null;
   }
 
@@ -49,7 +47,7 @@ export const sendPasswordResetEmail = async (email, resetToken, username) => {
       throw new Error('Email service not configured');
     }
 
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_ORIGIN || 'https://test-system-mu.vercel.app'}/reset-password?token=${resetToken}`;
     
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME || 'Quiz System'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
@@ -191,11 +189,10 @@ export const sendWelcomeEmail = async (email, username) => {
     const transporter = createTransporter();
     
     if (!transporter) {
-      console.log('Email service not configured, skipping welcome email');
       return { success: true, skipped: true };
     }
 
-    const loginUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/login`;
+    const loginUrl = `${process.env.FRONTEND_ORIGIN || 'https://test-system-mu.vercel.app'}/login`;
     
     const mailOptions = {
       from: `"${process.env.EMAIL_FROM_NAME || 'Quiz System'}" <${process.env.EMAIL_FROM || process.env.EMAIL_USER}>`,
@@ -301,10 +298,8 @@ export const verifyEmailConfig = async () => {
     }
 
     await transporter.verify();
-    console.log('✅ Email service is ready');
     return true;
   } catch (error) {
-    console.error('❌ Email service verification failed:', error.message);
     return false;
   }
 };
