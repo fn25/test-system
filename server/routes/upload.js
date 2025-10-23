@@ -57,10 +57,6 @@ router.post('/image', authenticateToken, requireAdmin, upload.single('image'), a
   }
 });
 
-
-  });
-});
-
 router.post('/video', authenticateToken, requireAdmin, upload.single('video'), async (req, res) => {
   try {
     if (!req.file) {
@@ -95,10 +91,6 @@ router.post('/video', authenticateToken, requireAdmin, upload.single('video'), a
   }
 });
 
-
-  });
-});
-
 router.delete('/:fileId', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -123,7 +115,7 @@ router.delete('/:fileId', authenticateToken, requireAdmin, async (req, res) => {
       message: 'Failed to delete file',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Delete failed'
     });
-  });
+  }
 });
 
 router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
@@ -159,10 +151,6 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
       error: process.env.NODE_ENV === 'development' ? error.message : 'List failed'
     });
   }
-});
-
-
-});
 });
 
 router.use((error, req, res, next) => {
