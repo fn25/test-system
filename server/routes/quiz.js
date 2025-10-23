@@ -158,10 +158,14 @@ router.get('/my-quizzes', authenticateToken, requireAdmin, async (req, res) => {
 // @access  Public
 router.get('/access-by-code/:code', [
   param('code')
-    .isLength({ min: 6, max: 10 })
-    .withMessage('Quiz code must be between 6 and 10 characters')
-    .isAlphanumeric()
-    .withMessage('Quiz code must be alphanumeric')
+    .custom((value) => {
+      const numericSix = /^[0-9]{6}$/;
+      const alphaNum = /^[A-Z0-9]{6,10}$/i;
+      if (numericSix.test(value) || alphaNum.test(value)) {
+        return true;
+      }
+      throw new Error('Quiz code must be 6-digit numeric or 6-10 alphanumeric characters');
+    })
 ], async (req, res) => {
   try {
     const errors = validationResult(req);

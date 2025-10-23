@@ -13,6 +13,7 @@ const CreateQuizPage = () => {
   const [quizCode, setQuizCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLive, setIsLive] = useState(false);
   const navigate = useNavigate();
 
   const {
@@ -85,12 +86,20 @@ const CreateQuizPage = () => {
 
   // Generate random quiz code
   const generateQuizCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let code = '';
-    for (let i = 0; i < 8; i++) {
-      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    if (isLive) {
+      let code = '';
+      for (let i = 0; i < 6; i++) {
+        code += Math.floor(Math.random() * 10).toString();
+      }
+      setQuizCode(code);
+    } else {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      let code = '';
+      for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      setQuizCode(code);
     }
-    setQuizCode(code);
     toast.success('Quiz code generated!');
   };
 
@@ -153,6 +162,12 @@ const CreateQuizPage = () => {
           </div>
           
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fff' }}>
+                <input type="checkbox" checked={isLive} onChange={() => setIsLive(!isLive)} />
+                Live
+              </label>
+            </div>
             {quizCode ? (
               <div style={{ 
                 display: 'flex', 
@@ -163,7 +178,7 @@ const CreateQuizPage = () => {
                 borderRadius: '10px',
                 color: 'white'
               }}>
-                <span style={{ fontWeight: 'bold', fontSize: '1.25rem', letterSpacing: '0.1em' }}>
+                <span style={{ fontWeight: '900', fontSize: '2rem', letterSpacing: '0.2em', lineHeight: 1 }}>
                   {quizCode}
                 </span>
                 <button

@@ -164,8 +164,17 @@ const RegisterPage = () => {
             )}
           </div>
 
-          {/* Hidden role field - defaults to 'user' */}
-          <input type="hidden" {...register('role')} value="user" />
+          {/* Role selection */}
+          <div className="form-group">
+            <label htmlFor="role" className="form-label">Role</label>
+            <select id="role" className="form-control" {...register('role')} defaultValue="user">
+              <option value="user">Student</option>
+              <option value="admin">Admin</option>
+            </select>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.5rem' }}>
+              Choose your role. Admin accounts should be created only for instructors/organizers.
+            </p>
+          </div>
 
           <button
             type="submit"
