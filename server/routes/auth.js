@@ -57,15 +57,13 @@ router.post('/register', [
     const { username, email, password, firstName, lastName, role } = req.body;
 
     const existingUser = await User.findOne({
-      where: {
-        [Op.or]: [{ email }, { username }]
-      }
+      where: { email }
     });
 
     if (existingUser) {
       return res.status(409).json({
         success: false,
-        message: 'User with this email or username already exists'
+        message: 'User with this email already exists'
       });
     }
 

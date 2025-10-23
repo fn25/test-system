@@ -115,11 +115,7 @@ const AppContent = () => {
           />
           <Route 
             path="/quiz/:id" 
-            element={
-              <ProtectedRoute>
-                <QuizTaking />
-              </ProtectedRoute>
-            } 
+            element={<QuizTaking />} 
           />
           <Route 
             path="/results" 

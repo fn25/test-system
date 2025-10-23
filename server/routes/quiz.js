@@ -319,12 +319,19 @@ router.post('/', authenticateToken, requireAdmin, [
       });
     }
 
-    const quizData = {
-      ...req.body,
-      createdBy: req.user.id
-    };
+    const { questions, ...quizData } = req.body;
+    quizData.createdBy = req.user.id;
 
     const quiz = await Quiz.create(quizData);
+
+    if (questions && Array.isArray(questions) && questions.length > 0) {
+      for (const questionData of questions) {
+        await Question.create({
+          ...questionData,
+          quizId: quiz.id
+        });
+      }
+    }
 
     const createdQuiz = await Quiz.findByPk(quiz.id, {
       include: [
@@ -332,6 +339,10 @@ router.post('/', authenticateToken, requireAdmin, [
           model: User,
           as: 'creator',
           attributes: ['id', 'username', 'firstName', 'lastName']
+        },
+        {
+          model: Question,
+          as: 'questions'
         }
       ]
     });
