@@ -13,14 +13,23 @@ export const up = async (queryInterface, Sequelize) => {
       type: Sequelize.TEXT,
       allowNull: true
     },
-    createdBy: {
-      type: Sequelize.UUID,
-      allowNull: false
+    instructions: {
+      type: Sequelize.TEXT,
+      allowNull: true
     },
-    quizCode: {
-      type: Sequelize.STRING(10),
+    timeLimit: {
+      type: Sequelize.INTEGER,
+      allowNull: true
+    },
+    passingScore: {
+      type: Sequelize.INTEGER,
       allowNull: true,
-      unique: true
+      defaultValue: 60
+    },
+    maxAttempts: {
+      type: Sequelize.INTEGER,
+      allowNull: true,
+      defaultValue: 1
     },
     isActive: {
       type: Sequelize.BOOLEAN,
@@ -37,6 +46,26 @@ export const up = async (queryInterface, Sequelize) => {
     startMode: {
       type: Sequelize.ENUM('auto', 'manual'),
       defaultValue: 'auto'
+    },
+    showCorrectAnswers: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false
+    },
+    randomizeQuestions: {
+      type: Sequelize.BOOLEAN,
+      defaultValue: false
+    },
+    category: {
+      type: Sequelize.STRING,
+      allowNull: true
+    },
+    difficulty: {
+      type: Sequelize.ENUM('easy', 'medium', 'hard'),
+      allowNull: true
+    },
+    createdBy: {
+      type: Sequelize.UUID,
+      allowNull: false
     },
     createdAt: {
       allowNull: false,

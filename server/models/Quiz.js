@@ -67,14 +67,9 @@ export default (sequelize) => {
       comment: 'Auto: starts immediately when participant joins, Manual: waits for admin to start'
     },
     quizCode: {
-      type: DataTypes.STRING(8),
+      type: DataTypes.STRING(10),
       allowNull: true,
       unique: true,
-      validate: {
-        len: [6, 8],
-        isUppercase: true,
-        isAlphanumeric: true
-      },
       comment: 'Unique code for guest access to quiz'
     },
     showCorrectAnswers: {
