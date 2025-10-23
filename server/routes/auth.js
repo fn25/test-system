@@ -1,445 +1,355 @@
-import express from 'express';
-import jwt from 'jsonwebtoken';
-import crypto from 'crypto';
-import { body, validationResult } from 'express-validator';
-import { Op } from 'sequelize';
-import { User } from '../models/index.js';
-import { authenticateToken } from '../middleware/auth.js';
-import { sendPasswordResetEmail } from '../services/emailService.js';
+import express from 'express';import express from 'express';
 
-const router = express.Router();
+import jwt from 'jsonwebtoken';import jwt from 'jsonwebtoken';
 
-const generateToken = (userId) => {
-  return jwt.sign(
-    { userId },
-    process.env.JWT_SECRET,
-    { expiresIn: '24h' }
-  );
-};
+import crypto from 'crypto';import crypto from 'crypto';
 
-router.post('/register', [
-  body('username')
-    .isLength({ min: 3, max: 30 })
-    .withMessage('Username must be between 3 and 30 characters')
-    // Allow letters, numbers and underscores to match frontend pattern
-    .matches(/^[a-zA-Z0-9_]+$/)
-    .withMessage('Username can only contain letters, numbers, and underscores'),
-  body('email')
-    .isEmail()
-    .withMessage('Please provide a valid email')
-    .normalizeEmail(),
-  body('password')
+import { body, validationResult } from 'express-validator';import { body, validationResult } from 'express-validator';
+
+import { User } from '../models/index.js';import { User } from '../models/index.js';
+
+import { authenticateToken } from '../middleware/auth.js';import { authenticateToken } from '../middleware/auth.js';
+
+import { sendPasswordResetEmail } from '../services/emailService.js';import { sendPasswordResetEmail } from '../services/emailService.js';
+
+
+
+const router = express.Router();const router = express.Router();
+
+
+
+const generateToken = (userId) => {const generateToken = (userId) => {
+
+  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '24h' });  return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '24h' });
+
+};};
+
+
+
+router.post('/register', [router.post('/register', [
+
+  body('username').isLength({ min: 3, max: 30 }).withMessage('Username must be between 3 and 30 characters').matches(/^[a-zA-Z0-9_]+$/).withMessage('Username can only contain letters, numbers, and underscores'),  body('username')
+
+  body('email').isEmail().withMessage('Please provide a valid email').normalizeEmail(),    .isLength({ min: 3, max: 30 })
+
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),    .withMessage('Username must be between 3 and 30 characters')
+
+  body('role').optional().isIn(['admin', 'user']).withMessage('Role must be either admin or user')    .matches(/^[a-zA-Z0-9_]+$/)
+
+], async (req, res) => {    .withMessage('Username can only contain letters, numbers, and underscores'),
+
+  try {  body('email')
+
+    const errors = validationResult(req);    .isEmail()
+
+    if (!errors.isEmpty()) {    .withMessage('Please provide a valid email')
+
+      return res.status(400).json({ success: false, message: 'Validation errors', errors: errors.array() });    .normalizeEmail(),
+
+    }  body('password')
+
     .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long'),
-  body('firstName')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('First name must be less than 50 characters'),
-  body('lastName')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Last name must be less than 50 characters'),
-  body('role')
-    .optional()
-    .isIn(['admin', 'user'])
-    .withMessage('Role must be either admin or user')
+
+    const { username, email, password, role } = req.body;    .withMessage('Password must be at least 6 characters long'),
+
+    const existingUser = await User.findOne({ email });  body('role')
+
+    if (existingUser) {    .optional()
+
+      return res.status(409).json({ success: false, message: 'User with this email already exists' });    .isIn(['admin', 'user'])
+
+    }    .withMessage('Role must be either admin or user')
+
 ], async (req, res) => {
-  try {
-    const errors = validationResult(req);
+
+    const user = await User.create({ username, email, password, role: role || 'user' });  try {
+
+    const token = generateToken(user._id);    const errors = validationResult(req);
+
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
 
-    const { username, email, password, firstName, lastName, role } = req.body;
+    res.status(201).json({      return res.status(400).json({
 
-    const existingUser = await User.findOne({
-      where: { email }
-    });
+      success: true,        success: false,
+
+      message: 'User registered successfully',        message: 'Validation errors',
+
+      data: { user: { id: user._id, username: user.username, email: user.email, role: user.role }, token }        errors: errors.array()
+
+    });      });
+
+  } catch (error) {    }
+
+    console.error('Registration error:', error);
+
+    res.status(500).json({ success: false, message: 'Registration failed', error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error' });    const { username, email, password, role } = req.body;
+
+  }
+
+});    const existingUser = await User.findOne({ email });
 
     if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: 'User with this email already exists'
-      });
-    }
 
-    const user = await User.create({
-      username,
-      email,
+router.post('/login', [      return res.status(409).json({
+
+  body('login').notEmpty().withMessage('Username or email is required'),        success: false,
+
+  body('password').notEmpty().withMessage('Password is required')        message: 'User with this email already exists'
+
+], async (req, res) => {      });
+
+  try {    }
+
+    const errors = validationResult(req);
+
+    if (!errors.isEmpty()) {    const user = await User.create({
+
+      return res.status(400).json({ success: false, message: 'Validation errors', errors: errors.array() });      username,
+
+    }      email,
+
       password,
-      firstName,
-      lastName,
-      role: role || 'user'
-    });
 
-    const token = generateToken(user.id);
+    const { login, password } = req.body;      role: role || 'user'
 
-    res.status(201).json({
+    const user = await User.findOne({ $or: [{ email: login }, { username: login }] });    });
+
+
+
+    if (!user) {    const token = generateToken(user._id);
+
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+
+    }    res.status(201).json({
+
       success: true,
-      message: 'User registered successfully',
-      data: {
-        user: user.toJSON(),
-        token
-      }
-    });
-  } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Registration failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
 
-router.post('/login', [
-  body('login')
-    .notEmpty()
-    .withMessage('Username or email is required'),
-  body('password')
-    .notEmpty()
-    .withMessage('Password is required')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
+    const isPasswordValid = await user.comparePassword(password);      message: 'User registered successfully',
+
+    if (!isPasswordValid) {      data: {
+
+      return res.status(401).json({ success: false, message: 'Invalid credentials' });        user: {
+
+    }          id: user._id,
+
+          username: user.username,
+
+    const token = generateToken(user._id);          email: user.email,
+
+          role: user.role
+
+    res.json({        },
+
+      success: true,        token
+
+      message: 'Login successful',      }
+
+      data: { user: { id: user._id, username: user.username, email: user.email, role: user.role }, token }    });
+
+    });  } catch (error) {
+
+  } catch (error) {    console.error('Registration error:', error);
+
+    console.error('Login error:', error);    res.status(500).json({
+
+    res.status(500).json({ success: false, message: 'Login failed', error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error' });      success: false,
+
+  }      message: 'Registration failed',
+
+});      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+
+    });
+
+router.get('/profile', authenticateToken, async (req, res) => {  }
+
+  try {});
+
+    res.json({
+
+      success: true,router.post('/login', [
+
+      message: 'Profile retrieved successfully',  body('login').notEmpty().withMessage('Username or email is required'),
+
+      data: { user: { id: req.user._id, username: req.user.username, email: req.user.email, role: req.user.role } }  body('password').notEmpty().withMessage('Password is required')
+
+    });], async (req, res) => {
+
+  } catch (error) {  try {
+
+    console.error('Profile error:', error);    const errors = validationResult(req);
+
+    res.status(500).json({ success: false, message: 'Failed to retrieve profile', error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error' });    if (!errors.isEmpty()) {
+
+  }      return res.status(400).json({
+
+});        success: false,
+
         message: 'Validation errors',
-        errors: errors.array()
-      });
+
+router.post('/verify-token', authenticateToken, (req, res) => {        errors: errors.array()
+
+  res.json({      });
+
+    success: true,    }
+
+    message: 'Token is valid',
+
+    data: { user: { id: req.user._id, username: req.user.username, email: req.user.email, role: req.user.role } }    const { login, password } = req.body;
+
+  });
+
+});    const user = await User.findOne({
+
+      \$or: [{ email: login }, { username: login }]
+
+router.post('/forgot-password', [    });
+
+  body('email').isEmail().withMessage('Please provide a valid email').normalizeEmail()
+
+], async (req, res) => {    if (!user) {
+
+  try {      return res.status(401).json({
+
+    const errors = validationResult(req);        success: false,
+
+    if (!errors.isEmpty()) {        message: 'Invalid credentials'
+
+      return res.status(400).json({ success: false, message: 'Validation errors', errors: errors.array() });      });
+
+    }    }
+
+
+
+    const { email } = req.body;    const isPasswordValid = await user.comparePassword(password);
+
+    const user = await User.findOne({ email });    if (!isPasswordValid) {
+
+          return res.status(401).json({
+
+    if (!user) {        success: false,
+
+      return res.json({ success: true, message: 'If an account exists with that email, a password reset link has been sent' });        message: 'Invalid credentials'
+
+    }      });
+
     }
 
-    const { login, password } = req.body;
+    const resetToken = crypto.randomBytes(32).toString('hex');
 
-    const user = await User.findOne({
-      where: {
-        [Op.or]: [
-          { email: login },
-          { username: login }
-        ]
-      }
-    });
+    const resetTokenExpiry = new Date(Date.now() + 3600000);    const token = generateToken(user._id);
 
-    if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
 
-    if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Account is deactivated'
-      });
-    }
 
-    const isPasswordValid = await user.validatePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
+    user.resetPasswordToken = resetToken;    res.json({
 
-    const token = generateToken(user.id);
+    user.resetPasswordExpires = resetTokenExpiry;      success: true,
 
-    res.json({
-      success: true,
-      message: 'Login successful',
+    await user.save();      message: 'Login successful',
+
       data: {
-        user: user.toJSON(),
-        token
-      }
-    });
-  } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Login failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
 
-router.get('/profile', authenticateToken, async (req, res) => {
-  try {
-    res.json({
-      success: true,
-      message: 'Profile retrieved successfully',
-      data: {
-        user: req.user.toJSON()
-      }
+    try {        user: {
+
+      await sendPasswordResetEmail(email, resetToken, user.username);          id: user._id,
+
+      res.json({ success: true, message: 'If an account exists with that email, a password reset link has been sent' });          username: user.username,
+
+    } catch (emailError) {          email: user.email,
+
+      console.error('Email send failed:', emailError);          role: user.role
+
+      user.resetPasswordToken = null;        },
+
+      user.resetPasswordExpires = null;        token
+
+      await user.save();      }
+
+      res.status(500).json({ success: false, message: 'Failed to send password reset email. Please try again later.' });    });
+
+    }  } catch (error) {
+
+  } catch (error) {    console.error('Login error:', error);
+
+    console.error('Forgot password error:', error);    res.status(500).json({
+
+    res.status(500).json({ success: false, message: 'An error occurred. Please try again later.', error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error' });      success: false,
+
+  }      message: 'Login failed',
+
+});      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+
     });
-  } catch (error) {
-    console.error('Profile error:', error);
-    res.status(500).json({
-      success: false,
+
+router.post('/reset-password', [  }
+
+  body('token').notEmpty().withMessage('Reset token is required'),});
+
+  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
+
+], async (req, res) => {router.get('/profile', authenticateToken, async (req, res) => {
+
+  try {  try {
+
+    const errors = validationResult(req);    res.json({
+
+    if (!errors.isEmpty()) {      success: true,
+
+      return res.status(400).json({ success: false, message: 'Validation errors', errors: errors.array() });      message: 'Profile retrieved successfully',
+
+    }      data: {
+
+        user: {
+
+    const { token, password } = req.body;          id: req.user._id,
+
+    const user = await User.findOne({ resetPasswordToken: token, resetPasswordExpires: { $gt: new Date() } });          username: req.user.username,
+
+          email: req.user.email,
+
+    if (!user) {          role: req.user.role
+
+      return res.status(400).json({ success: false, message: 'Invalid or expired reset token' });        }
+
+    }      }
+
+    });
+
+    user.password = password;  } catch (error) {
+
+    user.resetPasswordToken = null;    console.error('Profile error:', error);
+
+    user.resetPasswordExpires = null;    res.status(500).json({
+
+    await user.save();      success: false,
+
       message: 'Failed to retrieve profile',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
+
+    res.json({ success: true, message: 'Password has been reset successfully. You can now log in with your new password.' });      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+
+  } catch (error) {    });
+
+    console.error('Reset password error:', error);  }
+
+    res.status(500).json({ success: false, message: 'Failed to reset password', error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error' });});
+
   }
-});
 
-router.put('/profile', authenticateToken, [
-  body('firstName')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('First name must be less than 50 characters'),
-  body('lastName')
-    .optional()
-    .isLength({ max: 50 })
-    .withMessage('Last name must be less than 50 characters'),
-  body('email')
-    .optional()
-    .isEmail()
-    .withMessage('Please provide a valid email')
-    .normalizeEmail()
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
+});router.post('/verify-token', authenticateToken, (req, res) => {
 
-    const { firstName, lastName, email } = req.body;
-    const user = req.user;
-
-    if (email && email !== user.email) {
-      const existingUser = await User.findOne({ where: { email } });
-      if (existingUser) {
-        return res.status(409).json({
-          success: false,
-          message: 'Email already in use'
-        });
-      }
-    }
-
-    await user.update({
-      firstName: firstName !== undefined ? firstName : user.firstName,
-      lastName: lastName !== undefined ? lastName : user.lastName,
-      email: email !== undefined ? email : user.email
-    });
-
-    res.json({
-      success: true,
-      message: 'Profile updated successfully',
-      data: {
-        user: user.toJSON()
-      }
-    });
-  } catch (error) {
-    console.error('Profile update error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update profile',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-router.post('/change-password', authenticateToken, [
-  body('currentPassword')
-    .notEmpty()
-    .withMessage('Current password is required'),
-  body('newPassword')
-    .isLength({ min: 6 })
-    .withMessage('New password must be at least 6 characters long')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { currentPassword, newPassword } = req.body;
-    const user = req.user;
-
-    const isCurrentPasswordValid = await user.validatePassword(currentPassword);
-    if (!isCurrentPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Current password is incorrect'
-      });
-    }
-
-    await user.update({ password: newPassword });
-
-    res.json({
-      success: true,
-      message: 'Password changed successfully'
-    });
-  } catch (error) {
-    console.error('Password change error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to change password',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-router.post('/verify-token', authenticateToken, (req, res) => {
   res.json({
-    success: true,
+
+export default router;    success: true,
+
     message: 'Token is valid',
     data: {
-      user: req.user.toJSON()
+      user: {
+        id: req.user._id,
+        username: req.user.username,
+        email: req.user.email,
+        role: req.user.role
+      }
     }
   });
-});
-
-// @route   POST /api/auth/forgot-password
-// @desc    Send password reset email
-// @access  Public
-router.post('/forgot-password', [
-  body('email')
-    .isEmail()
-    .withMessage('Please provide a valid email')
-    .normalizeEmail()
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { email } = req.body;
-    
-    // Find user by email
-    const user = await User.findOne({ where: { email } });
-    
-    // Always return success to prevent email enumeration attacks
-    if (!user) {
-      return res.json({
-        success: true,
-        message: 'If an account exists with that email, a password reset link has been sent'
-      });
-    }
-
-    // Generate reset token
-    const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
-    // Save token to database
-    await user.update({
-      resetPasswordToken: resetToken,
-      resetPasswordExpires: resetTokenExpiry
-    });
-
-    // Send email
-    try {
-      await sendPasswordResetEmail(email, resetToken, user.username);
-      
-      console.log(`✅ Password reset email sent to ${email}`);
-      
-      res.json({
-        success: true,
-        message: 'If an account exists with that email, a password reset link has been sent'
-      });
-    } catch (emailError) {
-      console.error('Email send failed:', emailError);
-      
-      // Clear reset token if email fails
-      await user.update({
-        resetPasswordToken: null,
-        resetPasswordExpires: null
-      });
-      
-      // Return generic error to user
-      res.status(500).json({
-        success: false,
-        message: 'Failed to send password reset email. Please try again later.'
-      });
-    }
-  } catch (error) {
-    console.error('Forgot password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'An error occurred. Please try again later.',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-// @route   POST /api/auth/reset-password
-// @desc    Reset password with token
-// @access  Public
-router.post('/reset-password', [
-  body('token')
-    .notEmpty()
-    .withMessage('Reset token is required'),
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { token, password } = req.body;
-    
-    // Find user with valid reset token
-    const user = await User.findOne({
-      where: {
-        resetPasswordToken: token,
-        resetPasswordExpires: {
-          [Op.gt]: new Date() // Token not expired
-        }
-      }
-    });
-
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid or expired reset token'
-      });
-    }
-
-    // Update password and clear reset token
-    await user.update({
-      password: password,
-      resetPasswordToken: null,
-      resetPasswordExpires: null
-    });
-
-    console.log(`✅ Password reset successful for user: ${user.username}`);
-
-    res.json({
-      success: true,
-      message: 'Password has been reset successfully. You can now log in with your new password.'
-    });
-  } catch (error) {
-    console.error('Reset password error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to reset password',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
 });
 
 export default router;
