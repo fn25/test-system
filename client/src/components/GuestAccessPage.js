@@ -12,11 +12,10 @@ const GuestAccessPage = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if there's a quiz code in URL params
     const codeFromUrl = searchParams.get('code');
     if (codeFromUrl) {
-      setQuizCode(codeFromUrl.toUpperCase());
-      toast.info('Quiz code loaded. Click "Start Quiz" to begin.');
+      setQuizCode(codeFromUrl);
+      toast.success('Quiz code loaded. Click "Start Quiz" to begin.');
     }
   }, [searchParams]);
 
@@ -31,40 +30,15 @@ const GuestAccessPage = () => {
     setIsLoading(true);
     
     try {
-      // Check if user is logged in
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        // Not logged in - redirect to login with quiz code
-        toast.info('Please login to continue');
-        navigate(`/login?redirect=/play&code=${quizCode}`);
-        return;
-      }
-
-      // Backend API call to validate quiz code
-      const response = await fetch(`${getApiUrl()}/quiz/access-by-code/${quizCode}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
+      const response = await fetch(`${getApiUrl()}/quiz/access-by-code/${quizCode}`);
       const result = await response.json();
       
       if (!response.ok) {
-        if (response.status === 401) {
-          // Token expired - redirect to login
-          localStorage.removeItem('token');
-          toast.info('Session expired. Please login again');
-          navigate(`/login?redirect=/play&code=${quizCode}`);
-          return;
-        }
         throw new Error(result.message || 'Invalid quiz code');
       }
       
       const quiz = result.data.quiz;
-      
       toast.success(`Quiz found: ${quiz.title}`);
-      // Navigate to quiz
       navigate(`/quiz/${quiz.id}`);
     } catch (error) {
       console.error('Error accessing quiz:', error);
@@ -75,9 +49,8 @@ const GuestAccessPage = () => {
   };
 
   const handleCodeChange = (e) => {
-    // Auto-uppercase and limit length
-    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (value.length <= 10) {
+    const value = e.target.value.replace(/[^0-9]/g, '');
+    if (value.length <= 6) {
       setQuizCode(value);
     }
   };
@@ -104,15 +77,14 @@ const GuestAccessPage = () => {
               id="quizCode"
               type="text"
               className="form-control"
-              placeholder="Enter quiz code (e.g., QUIZ123)"
+              placeholder="Enter quiz code (e.g., 123456)"
               value={quizCode}
               onChange={handleCodeChange}
               style={{ 
                 textAlign: 'center', 
-                fontSize: '1.5rem', 
+                fontSize: '2rem', 
                 fontWeight: 'bold',
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase'
+                letterSpacing: '0.3em'
               }}
               autoFocus
             />

@@ -17,7 +17,7 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (quizCode) {
-      toast.info(`Quiz code: ${quizCode}. Please login to continue.`);
+      toast.success(`Quiz code: ${quizCode}. Please login to continue.`);
     }
   }, [quizCode]);
 

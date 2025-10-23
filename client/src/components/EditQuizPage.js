@@ -110,7 +110,7 @@ const EditQuizPage = () => {
     // Adjust correct answer if needed
     if (correctAnswer === optionIndex) {
       setValue(`questions.${questionIndex}.correctAnswer`, 0);
-      toast.info('Correct answer reset to first option');
+      toast.success('Correct answer reset to first option');
     } else if (correctAnswer > optionIndex) {
       setValue(`questions.${questionIndex}.correctAnswer`, correctAnswer - 1);
     }

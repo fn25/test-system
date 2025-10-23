@@ -13,7 +13,6 @@ const CreateQuizPage = () => {
   const [quizCode, setQuizCode] = useState('');
   const [copied, setCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isLive, setIsLive] = useState(false);
   const navigate = useNavigate();
 
   const {
@@ -76,7 +75,7 @@ const CreateQuizPage = () => {
     // Adjust correct answer if needed
     if (correctAnswer === optionIndex) {
       setValue(`questions.${questionIndex}.correctAnswer`, 0);
-      toast.info('Correct answer reset to first option');
+      toast.success('Correct answer reset to first option');
     } else if (correctAnswer > optionIndex) {
       setValue(`questions.${questionIndex}.correctAnswer`, correctAnswer - 1);
     }
@@ -86,20 +85,11 @@ const CreateQuizPage = () => {
 
   // Generate random quiz code
   const generateQuizCode = () => {
-    if (isLive) {
-      let code = '';
-      for (let i = 0; i < 6; i++) {
-        code += Math.floor(Math.random() * 10).toString();
-      }
-      setQuizCode(code);
-    } else {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-      let code = '';
-      for (let i = 0; i < 8; i++) {
-        code += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      setQuizCode(code);
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+      code += Math.floor(Math.random() * 10).toString();
     }
+    setQuizCode(code);
     toast.success('Quiz code generated!');
   };
 
@@ -162,12 +152,6 @@ const CreateQuizPage = () => {
           </div>
           
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginRight: '1rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#fff' }}>
-                <input type="checkbox" checked={isLive} onChange={() => setIsLive(!isLive)} />
-                Live
-              </label>
-            </div>
             {quizCode ? (
               <div style={{ 
                 display: 'flex', 
