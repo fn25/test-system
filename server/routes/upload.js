@@ -11,12 +11,9 @@ const imagekit = new ImageKit({
   urlEndpoint: process.env.IMAGEKIT_URL_ENDPOINT
 });
 
-const storage = multer.memoryStorage();
 const upload = multer({
-  storage,
-  limits: {
-    fileSize: 10 * 1024 * 1024
-  },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/') || file.mimetype.startsWith('video/')) {
       cb(null, true);
@@ -25,7 +22,6 @@ const upload = multer({
     }
   }
 });
-
 
 router.post('/image', authenticateToken, requireAdmin, upload.single('image'), async (req, res) => {
   try {
@@ -62,6 +58,9 @@ router.post('/image', authenticateToken, requireAdmin, upload.single('image'), a
 });
 
 
+  });
+});
+
 router.post('/video', authenticateToken, requireAdmin, upload.single('video'), async (req, res) => {
   try {
     if (!req.file) {
@@ -97,6 +96,9 @@ router.post('/video', authenticateToken, requireAdmin, upload.single('video'), a
 });
 
 
+  });
+});
+
 router.delete('/:fileId', authenticateToken, requireAdmin, async (req, res) => {
   try {
     const { fileId } = req.params;
@@ -121,16 +123,12 @@ router.delete('/:fileId', authenticateToken, requireAdmin, async (req, res) => {
       message: 'Failed to delete file',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Delete failed'
     });
-  }
+  });
 });
-
 
 router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const { 
-      limit = 50,
-      skip = 0 
-    } = req.query;
+    const { limit = 50, skip = 0 } = req.query;
 
     const result = await imagekit.listFiles({
       skip: parseInt(skip),
@@ -163,6 +161,9 @@ router.get('/list', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
+
+});
+});
 
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
