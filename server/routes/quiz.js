@@ -312,6 +312,7 @@ router.post('/', authenticateToken, requireAdmin, [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      console.log('❌ Validation errors:', errors.array());
       return res.status(400).json({
         success: false,
         message: 'Validation errors',
@@ -363,11 +364,13 @@ router.post('/', authenticateToken, requireAdmin, [
       data: { quiz: createdQuiz }
     });
   } catch (error) {
-    console.error('Create quiz error:', error);
+    console.error('❌ Create quiz error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Failed to create quiz',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
