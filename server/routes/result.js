@@ -1,197 +1,108 @@
 import express from 'express';
-import { body, validationResult, param } from 'express-validator';
-import { Result, Quiz, Question, User, sequelize } from '../models/index.js';
+import { body, validationResult } from 'express-validator';
+import { Result, Quiz, Question } from '../models/index.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
-
-router.post('/submit', authenticateToken, [
-  body('quizId')
-    .isUUID()
-    .withMessage('Invalid quiz ID'),
-  body('answers')
-    .isArray({ min: 1 })
-    .withMessage('Answers must be a non-empty array'),
-  body('timeSpent')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Time spent must be a non-negative integer'),
-  body('startedAt')
-    .optional()
-    .isISO8601()
-    .withMessage('Started at must be a valid date')
+router.post('/submit', [
+  body('quizId').notEmpty().withMessage('Quiz ID is required'),
+  body('answers').isArray({ min: 1 }).withMessage('Answers must be a non-empty array'),
+  body('guestName').optional().isString()
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, message: 'Validation errors', errors: errors.array() });
     }
 
-    const { quizId, answers, timeSpent, startedAt } = req.body;
-    const userId = req.user.id;
+    const { quizId, answers, guestName } = req.body;
+    const userId = req.user ? req.user._id : null;
 
-    const quiz = await Quiz.findByPk(quizId, {
-      include: [
-        {
-          model: Question,
-          as: 'questions',
-          order: [['order', 'ASC']]
-        }
-      ]
-    });
-
+    const quiz = await Quiz.findById(quizId);
     if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found'
-      });
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    if (!quiz.isActive) {
-      return res.status(403).json({
-        success: false,
-        message: 'Quiz is not active'
-      });
-    }
-
-    const canAccess = quiz.isPublic || quiz.createdBy === userId;
-    if (!canAccess) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied to this quiz'
-      });
-    }
-
-    if (quiz.maxAttempts) {
-      const previousAttempts = await Result.count({
-        where: { userId, quizId }
-      });
-
-      if (previousAttempts >= quiz.maxAttempts) {
-        return res.status(403).json({
-          success: false,
-          message: `Maximum attempts (${quiz.maxAttempts}) exceeded`
-        });
-      }
+    const questions = await Question.find({ quizId });
+    if (questions.length === 0) {
+      return res.status(400).json({ success: false, message: 'Quiz has no questions' });
     }
 
     let correctAnswers = 0;
     let totalPoints = 0;
-    let pointsEarned = 0;
     const processedAnswers = [];
 
-    quiz.questions.forEach(question => {
-  totalPoints += question.points;
-      const userAnswer = answers.find(a => a.questionId === question.id);
+    questions.forEach(question => {
+      totalPoints += question.points || 1;
+      const userAnswer = answers.find(a => a.questionId === question._id.toString());
       const isCorrect = userAnswer && 
         String(userAnswer.answer).toLowerCase().trim() === 
         String(question.correctAnswer).toLowerCase().trim();
 
       if (isCorrect) {
         correctAnswers++;
-        pointsEarned += question.points;
       }
 
       processedAnswers.push({
-        questionId: question.id,
+        questionId: question._id,
         userAnswer: userAnswer ? userAnswer.answer : null,
-        correctAnswer: question.correctAnswer,
-        isCorrect,
-        points: question.points,
-        pointsEarned: isCorrect ? question.points : 0
+        isCorrect
       });
     });
 
-    const score = totalPoints > 0 ? Math.round((pointsEarned / totalPoints) * 100) : 0;
-    const isPassed = score >= (quiz.passingScore || 60);
-
-    const attemptNumber = await Result.count({
-      where: { userId, quizId }
-    }) + 1;
+    const score = totalPoints > 0 ? (correctAnswers / questions.length) * 100 : 0;
 
     const result = await Result.create({
-      userId,
       quizId,
+      userId,
+      guestName,
       score,
-      totalQuestions: quiz.questions.length,
+      totalQuestions: questions.length,
       correctAnswers,
-      totalPoints,
-      pointsEarned,
-      timeSpent: timeSpent || null,
-      answers: processedAnswers,
-      isPassed,
-      attemptNumber,
-      startedAt: startedAt ? new Date(startedAt) : new Date(),
-      completedAt: new Date()
-    });
-
-    const resultWithData = await Result.findByPk(result.id, {
-      include: [
-        {
-          model: Quiz,
-          as: 'quiz',
-          attributes: ['id', 'title', 'passingScore', 'showCorrectAnswers']
-        },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'username', 'firstName', 'lastName']
-        }
-      ]
+      answers: processedAnswers
     });
 
     res.status(201).json({
       success: true,
       message: 'Quiz submitted successfully',
       data: {
-        result: resultWithData,
-        showAnswers: quiz.showCorrectAnswers || req.user.role === 'admin'
+        result: result.toObject(),
+        score,
+        correctAnswers,
+        totalQuestions: questions.length
       }
     });
   } catch (error) {
-    console.error('Submit quiz error:', error);
+    console.error('Submit result error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to submit quiz',
+      message: 'Failed to submit result',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
-
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      quizId,
-      passed
-    } = req.query;
+    const { page = 1, limit = 10, quizId } = req.query;
+    const skip = (page - 1) * limit;
+    const filter = {};
 
-    const offset = (page - 1) * limit;
-    const where = { userId: req.user.id };
+    if (req.user.role !== 'admin') {
+      filter.userId = req.user._id;
+    }
+    if (quizId) {
+      filter.quizId = quizId;
+    }
 
-    if (quizId) where.quizId = quizId;
-    if (passed !== undefined) where.isPassed = passed === 'true';
-
-    const { count, rows: results } = await Result.findAndCountAll({
-      where,
-      include: [
-        {
-          model: Quiz,
-          as: 'quiz',
-          attributes: ['id', 'title', 'category', 'difficulty', 'passingScore']
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
+    const count = await Result.countDocuments(filter);
+    const results = await Result.find(filter)
+      .populate('quizId', 'title description')
+      .populate('userId', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
 
     res.json({
       success: true,
@@ -216,67 +127,25 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-
-router.get('/:id', authenticateToken, [
-  param('id').isUUID().withMessage('Invalid result ID')
-], async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
     const { id } = req.params;
-    
-    const result = await Result.findByPk(id, {
-      include: [
-        {
-          model: Quiz,
-          as: 'quiz',
-          attributes: ['id', 'title', 'showCorrectAnswers', 'passingScore'],
-          include: [
-            {
-              model: Question,
-              as: 'questions',
-              attributes: ['id', 'question', 'type', 'options', 'correctAnswer', 'explanation'],
-              order: [['order', 'ASC']]
-            }
-          ]
-        },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'username', 'firstName', 'lastName']
-        }
-      ]
-    });
+    const result = await Result.findById(id)
+      .populate('quizId', 'title description')
+      .populate('userId', 'username email');
 
     if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: 'Result not found'
-      });
+      return res.status(404).json({ success: false, message: 'Result not found' });
     }
 
-    const canView = result.userId === req.user.id || req.user.role === 'admin';
-    if (!canView) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied to this result'
-      });
+    if (req.user.role !== 'admin' && result.userId && result.userId._id.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
     res.json({
       success: true,
       message: 'Result retrieved successfully',
-      data: {
-        result,
-        showAnswers: result.quiz.showCorrectAnswers || req.user.role === 'admin'
-      }
+      data: { result }
     });
   } catch (error) {
     console.error('Get result error:', error);
@@ -288,90 +157,33 @@ router.get('/:id', authenticateToken, [
   }
 });
 
-
-router.get('/quiz/:quizId', authenticateToken, requireAdmin, [
-  param('quizId').isUUID().withMessage('Invalid quiz ID')
-], async (req, res) => {
+router.get('/quiz/:quizId', authenticateToken, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
     const { quizId } = req.params;
-    const {
-      page = 1,
-      limit = 10,
-      passed,
-      sortBy = 'score',
-      sortOrder = 'desc'
-    } = req.query;
+    const { page = 1, limit = 10 } = req.query;
+    const skip = (page - 1) * limit;
 
-    const offset = (page - 1) * limit;
-    const where = { quizId };
-
-    if (passed !== undefined) where.isPassed = passed === 'true';
-
-    const orderBy = [];
-    if (sortBy === 'score') {
-      orderBy.push(['score', sortOrder.toUpperCase()]);
-    } else if (sortBy === 'date') {
-      orderBy.push(['createdAt', sortOrder.toUpperCase()]);
-    } else if (sortBy === 'time') {
-      orderBy.push(['timeSpent', sortOrder.toUpperCase()]);
+    const quiz = await Quiz.findById(quizId);
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
-  orderBy.push(['createdAt', 'DESC']);
 
-    const { count, rows: results } = await Result.findAndCountAll({
-      where,
-      include: [
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'username', 'firstName', 'lastName', 'email']
-        },
-        {
-          model: Quiz,
-          as: 'quiz',
-          attributes: ['id', 'title', 'passingScore']
-        }
-      ],
-      order: orderBy,
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
+    if (req.user.role !== 'admin' && quiz.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
 
-    const stats = await Result.findOne({
-      where: { quizId },
-      attributes: [
-        [sequelize.fn('COUNT', sequelize.col('id')), 'totalAttempts'],
-        [sequelize.fn('AVG', sequelize.col('score')), 'averageScore'],
-        [sequelize.fn('MAX', sequelize.col('score')), 'highestScore'],
-        [sequelize.fn('MIN', sequelize.col('score')), 'lowestScore'],
-        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN "isPassed" = true THEN 1 END')), 'passedCount']
-      ],
-      raw: true
-    });
+    const count = await Result.countDocuments({ quizId });
+    const results = await Result.find({ quizId })
+      .populate('userId', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
 
     res.json({
       success: true,
       message: 'Quiz results retrieved successfully',
       data: {
         results,
-        statistics: {
-          totalAttempts: parseInt(stats.totalAttempts) || 0,
-          averageScore: parseFloat(stats.averageScore) || 0,
-          highestScore: parseInt(stats.highestScore) || 0,
-          lowestScore: parseInt(stats.lowestScore) || 0,
-          passedCount: parseInt(stats.passedCount) || 0,
-          passRate: stats.totalAttempts > 0 
-            ? ((parseInt(stats.passedCount) || 0) / parseInt(stats.totalAttempts) * 100).toFixed(2)
-            : 0
-        },
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(count / limit),
@@ -390,92 +202,16 @@ router.get('/quiz/:quizId', authenticateToken, requireAdmin, [
   }
 });
 
-
-router.get('/user/:userId', authenticateToken, requireAdmin, [
-  param('userId').isUUID().withMessage('Invalid user ID')
-], async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { userId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-
-    const offset = (page - 1) * limit;
-
-    const { count, rows: results } = await Result.findAndCountAll({
-      where: { userId },
-      include: [
-        {
-          model: Quiz,
-          as: 'quiz',
-          attributes: ['id', 'title', 'category', 'difficulty', 'passingScore']
-        },
-        {
-          model: User,
-          as: 'user',
-          attributes: ['id', 'username', 'firstName', 'lastName', 'email']
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
-
-    res.json({
-      success: true,
-      message: 'User results retrieved successfully',
-      data: {
-        results,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(count / limit),
-          totalItems: count,
-          itemsPerPage: parseInt(limit)
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Get user results error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to retrieve user results',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-
-router.delete('/:id', authenticateToken, requireAdmin, [
-  param('id').isUUID().withMessage('Invalid result ID')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
     const { id } = req.params;
-    const result = await Result.findByPk(id);
+    const result = await Result.findById(id);
 
     if (!result) {
-      return res.status(404).json({
-        success: false,
-        message: 'Result not found'
-      });
+      return res.status(404).json({ success: false, message: 'Result not found' });
     }
 
-    await result.destroy();
+    await Result.findByIdAndDelete(id);
 
     res.json({
       success: true,

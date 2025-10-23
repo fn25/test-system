@@ -1,68 +1,42 @@
 import express from 'express';
 import { body, validationResult, param } from 'express-validator';
-import { Op } from 'sequelize';
-import { Quiz, Question, User } from '../models/index.js';
+import { Quiz, Question } from '../models/index.js';
 import { authenticateToken, requireAdmin } from '../middleware/auth.js';
 
 const router = express.Router();
 
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      category,
-      difficulty,
-      isPublic,
-      search
-    } = req.query;
+    const { page = 1, limit = 10, search } = req.query;
+    const skip = (page - 1) * limit;
+    const filter = {};
 
-    const offset = (page - 1) * limit;
-    const where = {};
-
-    if (category) where.category = category;
-    if (difficulty) where.difficulty = difficulty;
-    if (isPublic !== undefined) where.isPublic = isPublic === 'true';
     if (req.user.role !== 'admin') {
-      where.isActive = true;
-      where[Op.or] = [
-        { isPublic: true },
-        { createdBy: req.user.id }
-      ];
+      filter.$or = [{ isPublic: true }, { userId: req.user._id }];
     }
     if (search) {
-      where[Op.or] = [
-        { title: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } }
+      filter.$or = [
+        { title: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } }
       ];
     }
 
-    const { count, rows: quizzes } = await Quiz.findAndCountAll({
-      where,
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'username', 'firstName', 'lastName']
-        },
-        {
-          model: Question,
-          as: 'questions',
-          attributes: ['id'],
-          required: false
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
+    const count = await Quiz.countDocuments(filter);
+    const quizzes = await Quiz.find(filter)
+      .populate('userId', 'username email')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
 
-    const quizzesWithCounts = quizzes.map(quiz => {
-      const quizData = quiz.toJSON();
-      quizData.questionCount = quiz.questions.length;
-      delete quizData.questions;
-      return quizData;
-    });
+    const quizzesWithCounts = await Promise.all(
+      quizzes.map(async (quiz) => {
+        const questionCount = await Question.countDocuments({ quizId: quiz._id });
+        return {
+          ...quiz.toObject(),
+          questionCount
+        };
+      })
+    );
 
     res.json({
       success: true,
@@ -87,48 +61,26 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// @route   GET /api/quiz/my-quizzes
-// @desc    Get quizzes created by current user (admin)
-// @access  Private (Admin only)
 router.get('/my-quizzes', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 100,
-      search
-    } = req.query;
+    const { page = 1, limit = 100 } = req.query;
+    const skip = (page - 1) * limit;
 
-    const offset = (page - 1) * limit;
-    const where = { createdBy: req.user.id };
+    const count = await Quiz.countDocuments({ userId: req.user._id });
+    const quizzes = await Quiz.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(skip);
 
-    if (search) {
-      where[Op.or] = [
-        { title: { [Op.iLike]: `%${search}%` } },
-        { description: { [Op.iLike]: `%${search}%` } }
-      ];
-    }
-
-    const { count, rows: quizzes } = await Quiz.findAndCountAll({
-      where,
-      include: [
-        {
-          model: Question,
-          as: 'questions',
-          attributes: ['id'],
-          required: false
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: parseInt(limit),
-      offset: parseInt(offset)
-    });
-
-    const quizzesWithCounts = quizzes.map(quiz => {
-      const quizData = quiz.toJSON();
-      quizData.questionCount = quiz.questions.length;
-      delete quizData.questions;
-      return quizData;
-    });
+    const quizzesWithCounts = await Promise.all(
+      quizzes.map(async (quiz) => {
+        const questionCount = await Question.countDocuments({ quizId: quiz._id });
+        return {
+          ...quiz.toObject(),
+          questionCount
+        };
+      })
+    );
 
     res.json({
       success: true,
@@ -153,56 +105,49 @@ router.get('/my-quizzes', authenticateToken, requireAdmin, async (req, res) => {
   }
 });
 
-// @route   GET /api/quiz/access-by-code/:code
-// @desc    Access quiz by code (for guest users)
-// @access  Public
 router.get('/access-by-code/:code', [
-  param('code')
-    .isLength({ min: 6, max: 6 })
-    .withMessage('Quiz code must be 6 digits')
-    .isNumeric()
-    .withMessage('Quiz code must contain only numbers')
+  param('code').isLength({ min: 6, max: 6 }).withMessage('Quiz code must be 6 digits').isNumeric().withMessage('Quiz code must contain only numbers')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, message: 'Validation errors', errors: errors.array() });
     }
 
     const { code } = req.params;
-    
-    const quiz = await Quiz.findOne({
-      where: { 
-        quizCode: code,
-        isActive: true
-      },
-      include: [
-        {
-          model: Question,
-          as: 'questions',
-          attributes: { exclude: ['correctAnswer', 'explanation'] }
-        }
-      ]
-    });
+    const quiz = await Quiz.findOne({ quizCode: code });
 
     if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found with this code'
-      });
+      return res.status(404).json({ success: false, message: 'Quiz not found or inactive' });
     }
+
+    const questions = await Question.find({ quizId: quiz._id }).select('-correctAnswer');
 
     res.json({
       success: true,
-      message: 'Quiz found',
-      data: { quiz }
+      message: 'Quiz accessed successfully',
+      data: {
+        quiz: {
+          id: quiz._id,
+          title: quiz.title,
+          description: quiz.description,
+          isLive: quiz.isLive,
+          startTime: quiz.startTime,
+          endTime: quiz.endTime
+        },
+        questions: questions.map(q => ({
+          id: q._id,
+          questionText: q.questionText,
+          questionType: q.questionType,
+          options: q.options,
+          points: q.points,
+          timeLimit: q.timeLimit,
+          imageUrl: q.imageUrl
+        }))
+      }
     });
   } catch (error) {
-    console.error('Access by code error:', error);
+    console.error('Access quiz by code error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to access quiz',
@@ -211,63 +156,28 @@ router.get('/access-by-code/:code', [
   }
 });
 
-
-router.get('/:id', authenticateToken, [
-  param('id').isUUID().withMessage('Invalid quiz ID')
-], async (req, res) => {
+router.get('/:id', authenticateToken, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
     const { id } = req.params;
-    const { includeAnswers = false } = req.query;
-
-    const quiz = await Quiz.findByPk(id, {
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'username', 'firstName', 'lastName']
-        },
-        {
-          model: Question,
-          as: 'questions',
-          attributes: includeAnswers === 'true' || req.user.role === 'admin' 
-            ? undefined 
-            : { exclude: ['correctAnswer', 'explanation'] },
-          order: [['order', 'ASC']]
-        }
-      ]
-    });
+    const quiz = await Quiz.findById(id).populate('userId', 'username email');
 
     if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found'
-      });
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-  const canView = quiz.isPublic || 
-           quiz.createdBy === req.user.id || 
-           req.user.role === 'admin';
-
-    if (!canView) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied to this quiz'
-      });
+    if (req.user.role !== 'admin' && quiz.userId.toString() !== req.user._id.toString() && !quiz.isPublic) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
+
+    const questions = await Question.find({ quizId: id });
 
     res.json({
       success: true,
       message: 'Quiz retrieved successfully',
-      data: { quiz }
+      data: {
+        quiz: quiz.toObject(),
+        questions
+      }
     });
   } catch (error) {
     console.error('Get quiz error:', error);
@@ -279,215 +189,106 @@ router.get('/:id', authenticateToken, [
   }
 });
 
-
 router.post('/', authenticateToken, requireAdmin, [
-  body('title')
-    .isLength({ min: 1, max: 200 })
-    .withMessage('Title must be between 1 and 200 characters'),
-  body('description')
-    .optional()
-    .isLength({ max: 2000 })
-    .withMessage('Description must be less than 2000 characters'),
-  body('timeLimit')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Time limit must be a positive integer'),
-  body('passingScore')
-    .optional()
-    .isInt({ min: 0, max: 100 })
-    .withMessage('Passing score must be between 0 and 100'),
-  body('maxAttempts')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Max attempts must be a positive integer'),
-  body('category')
-    .optional()
-    .isLength({ max: 100 })
-    .withMessage('Category must be less than 100 characters'),
-  body('difficulty')
-    .optional()
-    .isIn(['easy', 'medium', 'hard'])
-    .withMessage('Difficulty must be easy, medium, or hard')
+  body('title').notEmpty().withMessage('Title is required').isLength({ max: 200 }).withMessage('Title must be less than 200 characters'),
+  body('description').optional().isLength({ max: 1000 }).withMessage('Description must be less than 1000 characters'),
+  body('questions').isArray({ min: 1 }).withMessage('At least one question is required'),
+  body('questions.*.questionText').notEmpty().withMessage('Question text is required'),
+  body('questions.*.correctAnswer').notEmpty().withMessage('Correct answer is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ Validation errors:', errors.array());
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+      return res.status(400).json({ success: false, message: 'Validation errors', errors: errors.array() });
     }
 
-    const { questions, ...quizData } = req.body;
-    quizData.createdBy = req.user.id;
+    const { title, description, questions } = req.body;
 
-    console.log('📥 Received quiz data:', { ...quizData, questionsCount: questions?.length || 0 });
-    console.log('📊 Questions:', JSON.stringify(questions, null, 2));
-
-    const quiz = await Quiz.create(quizData);
-    console.log('✅ Quiz created with ID:', quiz.id);
-
-    if (questions && Array.isArray(questions) && questions.length > 0) {
-      console.log(`📝 Creating ${questions.length} questions...`);
-      for (const questionData of questions) {
-        const createdQuestion = await Question.create({
-          ...questionData,
-          quizId: quiz.id
-        });
-        console.log(`✅ Question created with ID: ${createdQuestion.id}`);
-      }
-    } else {
-      console.log('⚠️ No questions provided or questions is not an array');
-    }
-
-    const createdQuiz = await Quiz.findByPk(quiz.id, {
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'username', 'firstName', 'lastName']
-        },
-        {
-          model: Question,
-          as: 'questions'
-        }
-      ]
+    const quiz = await Quiz.create({
+      title,
+      description,
+      userId: req.user._id,
+      isPublic: true
     });
 
-    console.log(`✅ Quiz retrieved with ${createdQuiz.questions.length} questions`);
+    const createdQuestions = await Promise.all(
+      questions.map(async (q) => {
+        return await Question.create({
+          quizId: quiz._id,
+          questionText: q.questionText,
+          questionType: q.questionType || 'multiple-choice',
+          options: q.options || [],
+          correctAnswer: q.correctAnswer,
+          points: q.points || 1,
+          timeLimit: q.timeLimit || 30,
+          imageUrl: q.imageUrl
+        });
+      })
+    );
 
     res.status(201).json({
       success: true,
       message: 'Quiz created successfully',
-      data: { quiz: createdQuiz }
+      data: {
+        quiz: quiz.toObject(),
+        questions: createdQuestions
+      }
     });
   } catch (error) {
-    console.error('❌ Create quiz error:', error);
-    console.error('Error stack:', error.stack);
+    console.error('Create quiz error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to create quiz',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error',
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
 });
 
-
-router.put('/:id', authenticateToken, requireAdmin, [
-  param('id').isUUID().withMessage('Invalid quiz ID'),
-  body('title')
-    .optional()
-    .isLength({ min: 1, max: 200 })
-    .withMessage('Title must be between 1 and 200 characters'),
-  body('description')
-    .optional()
-    .isLength({ max: 2000 })
-    .withMessage('Description must be less than 2000 characters'),
-  body('timeLimit')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Time limit must be a positive integer'),
-  body('passingScore')
-    .optional()
-    .isInt({ min: 0, max: 100 })
-    .withMessage('Passing score must be between 0 and 100'),
-  body('maxAttempts')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Max attempts must be a positive integer'),
-  body('category')
-    .optional()
-    .isLength({ max: 100 })
-    .withMessage('Category must be less than 100 characters'),
-  body('difficulty')
-    .optional()
-    .isIn(['easy', 'medium', 'hard'])
-    .withMessage('Difficulty must be easy, medium, or hard')
-], async (req, res) => {
+router.put('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
     const { id } = req.params;
-    const { questions, ...quizData } = req.body;
-    
-    const quiz = await Quiz.findByPk(id);
+    const { title, description, questions } = req.body;
 
+    const quiz = await Quiz.findById(id);
     if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found'
-      });
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    // Update quiz basic info
-    await quiz.update(quizData);
+    if (quiz.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
 
-    // Update questions if provided
+    if (title) quiz.title = title;
+    if (description !== undefined) quiz.description = description;
+    await quiz.save();
+
     if (questions && Array.isArray(questions)) {
-      // Get existing questions
-      const existingQuestions = await Question.findAll({
-        where: { quizId: id }
-      });
-
-      const existingQuestionIds = existingQuestions.map(q => q.id);
-      const updatedQuestionIds = questions.filter(q => q.id).map(q => q.id);
-
-      // Delete questions that are no longer in the list
-      const questionsToDelete = existingQuestionIds.filter(
-        qId => !updatedQuestionIds.includes(qId)
+      await Question.deleteMany({ quizId: id });
+      await Promise.all(
+        questions.map(async (q) => {
+          return await Question.create({
+            quizId: id,
+            questionText: q.questionText,
+            questionType: q.questionType || 'multiple-choice',
+            options: q.options || [],
+            correctAnswer: q.correctAnswer,
+            points: q.points || 1,
+            timeLimit: q.timeLimit || 30,
+            imageUrl: q.imageUrl
+          });
+        })
       );
-      
-      if (questionsToDelete.length > 0) {
-        await Question.destroy({
-          where: { id: questionsToDelete }
-        });
-      }
-
-      // Update or create questions
-      for (const questionData of questions) {
-        if (questionData.id) {
-          // Update existing question
-          await Question.update(questionData, {
-            where: { id: questionData.id, quizId: id }
-          });
-        } else {
-          // Create new question
-          await Question.create({
-            ...questionData,
-            quizId: id
-          });
-        }
-      }
     }
 
-    const updatedQuiz = await Quiz.findByPk(quiz.id, {
-      include: [
-        {
-          model: User,
-          as: 'creator',
-          attributes: ['id', 'username', 'firstName', 'lastName']
-        },
-        {
-          model: Question,
-          as: 'questions'
-        }
-      ]
-    });
+    const updatedQuestions = await Question.find({ quizId: id });
 
     res.json({
       success: true,
       message: 'Quiz updated successfully',
-      data: { quiz: updatedQuiz }
+      data: {
+        quiz: quiz.toObject(),
+        questions: updatedQuestions
+      }
     });
   } catch (error) {
     console.error('Update quiz error:', error);
@@ -499,31 +300,21 @@ router.put('/:id', authenticateToken, requireAdmin, [
   }
 });
 
-
-router.delete('/:id', authenticateToken, requireAdmin, [
-  param('id').isUUID().withMessage('Invalid quiz ID')
-], async (req, res) => {
+router.delete('/:id', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
     const { id } = req.params;
-    const quiz = await Quiz.findByPk(id);
+    const quiz = await Quiz.findById(id);
 
     if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found'
-      });
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    await quiz.destroy();
+    if (quiz.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    await Question.deleteMany({ quizId: id });
+    await Quiz.findByIdAndDelete(id);
 
     res.json({
       success: true,
@@ -539,300 +330,76 @@ router.delete('/:id', authenticateToken, requireAdmin, [
   }
 });
 
-
-router.post('/:id/questions', authenticateToken, requireAdmin, [
-  param('id').isUUID().withMessage('Invalid quiz ID'),
-  body('question')
-    .isLength({ min: 1, max: 2000 })
-    .withMessage('Question must be between 1 and 2000 characters'),
-  body('type')
-    .isIn(['multiple_choice', 'true_false', 'short_answer'])
-    .withMessage('Type must be multiple_choice, true_false, or short_answer'),
-  body('options')
-    .optional()
-    .isArray({ min: 2 })
-    .withMessage('Options must be an array with at least 2 items'),
-  body('correctAnswer')
-    .notEmpty()
-    .withMessage('Correct answer is required'),
-  body('points')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Points must be a positive integer'),
-  body('order')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Order must be a non-negative integer')
-], async (req, res) => {
+router.post('/:id/go-live', authenticateToken, requireAdmin, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
     const { id } = req.params;
-    const quiz = await Quiz.findByPk(id);
+    const quiz = await Quiz.findById(id);
 
     if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found'
-      });
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
     }
 
-    if (!req.body.order) {
-      const maxOrder = await Question.max('order', { where: { quizId: id } });
-      req.body.order = (maxOrder || 0) + 1;
+    if (quiz.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
     }
 
-    const questionData = {
-      ...req.body,
-      quizId: id
-    };
-
-    const question = await Question.create(questionData);
-
-    res.status(201).json({
-      success: true,
-      message: 'Question added successfully',
-      data: { question }
-    });
-  } catch (error) {
-    console.error('Add question error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to add question',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-
-router.put('/:quizId/questions/:questionId', authenticateToken, requireAdmin, [
-  param('quizId').isUUID().withMessage('Invalid quiz ID'),
-  param('questionId').isUUID().withMessage('Invalid question ID'),
-  body('question')
-    .optional()
-    .isLength({ min: 1, max: 2000 })
-    .withMessage('Question must be between 1 and 2000 characters'),
-  body('type')
-    .optional()
-    .isIn(['multiple_choice', 'true_false', 'short_answer'])
-    .withMessage('Type must be multiple_choice, true_false, or short_answer'),
-  body('options')
-    .optional()
-    .isArray({ min: 2 })
-    .withMessage('Options must be an array with at least 2 items'),
-  body('correctAnswer')
-    .optional()
-    .notEmpty()
-    .withMessage('Correct answer cannot be empty'),
-  body('points')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Points must be a positive integer'),
-  body('order')
-    .optional()
-    .isInt({ min: 0 })
-    .withMessage('Order must be a non-negative integer')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+    const questionCount = await Question.countDocuments({ quizId: id });
+    if (questionCount === 0) {
+      return res.status(400).json({ success: false, message: 'Cannot go live: Quiz has no questions' });
     }
 
-    const { quizId, questionId } = req.params;
-    
-    const question = await Question.findOne({
-      where: { id: questionId, quizId }
-    });
-
-    if (!question) {
-      return res.status(404).json({
-        success: false,
-        message: 'Question not found'
-      });
+    if (!quiz.quizCode) {
+      quiz.quizCode = Math.floor(100000 + Math.random() * 900000).toString();
     }
-
-    await question.update(req.body);
+    quiz.isLive = true;
+    quiz.startTime = new Date();
+    await quiz.save();
 
     res.json({
       success: true,
-      message: 'Question updated successfully',
-      data: { question }
-    });
-  } catch (error) {
-    console.error('Update question error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update question',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-
-router.delete('/:quizId/questions/:questionId', authenticateToken, requireAdmin, [
-  param('quizId').isUUID().withMessage('Invalid quiz ID'),
-  param('questionId').isUUID().withMessage('Invalid question ID')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { quizId, questionId } = req.params;
-    
-    const question = await Question.findOne({
-      where: { id: questionId, quizId }
-    });
-
-    if (!question) {
-      return res.status(404).json({
-        success: false,
-        message: 'Question not found'
-      });
-    }
-
-    await question.destroy();
-
-    res.json({
-      success: true,
-      message: 'Question deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete question error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete question',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-// @route   PATCH /api/quiz/:id/privacy
-// @desc    Toggle quiz privacy (public/private)
-// @access  Private (Admin/Creator only)
-router.patch('/:id/privacy', authenticateToken, requireAdmin, [
-  param('id').isUUID().withMessage('Invalid quiz ID'),
-  body('isPublic').isBoolean().withMessage('isPublic must be a boolean')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { id } = req.params;
-    const { isPublic } = req.body;
-
-    const quiz = await Quiz.findByPk(id);
-
-    if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found'
-      });
-    }
-
-    // Check if user is creator or admin
-    if (quiz.createdBy !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only modify your own quizzes.'
-      });
-    }
-
-    await quiz.update({ isPublic });
-
-    res.json({
-      success: true,
-      message: `Quiz is now ${isPublic ? 'public' : 'private'}`,
-      data: { 
-        quiz: {
-          id: quiz.id,
-          title: quiz.title,
-          isPublic: quiz.isPublic
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Toggle privacy error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to update quiz privacy',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
-    });
-  }
-});
-
-// @route   GET /api/quiz/:id/participants
-// @desc    Get participants who joined a quiz (for live hosting)
-// @access  Private (Admin/Creator only)
-router.get('/:id/participants', authenticateToken, requireAdmin, [
-  param('id').isUUID().withMessage('Invalid quiz ID')
-], async (req, res) => {
-  try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
-    }
-
-    const { id } = req.params;
-    
-    const quiz = await Quiz.findByPk(id);
-    
-    if (!quiz) {
-      return res.status(404).json({
-        success: false,
-        message: 'Quiz not found'
-      });
-    }
-
-    // Check if user is creator or admin
-    if (quiz.createdBy !== req.user.id && req.user.role !== 'admin') {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied. You can only view participants of your own quizzes.'
-      });
-    }
-
-    // For now, return empty array as participants tracking is not yet implemented
-    // This will be implemented with WebSocket or polling mechanism
-    res.json({
-      success: true,
-      message: 'Participants retrieved successfully',
+      message: 'Quiz is now live',
       data: {
-        participants: []
+        quiz: quiz.toObject(),
+        questionCount
       }
     });
   } catch (error) {
-    console.error('Get participants error:', error);
+    console.error('Go live error:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to retrieve participants',
+      message: 'Failed to make quiz live',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
+    });
+  }
+});
+
+router.post('/:id/end-live', authenticateToken, requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const quiz = await Quiz.findById(id);
+
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: 'Quiz not found' });
+    }
+
+    if (quiz.userId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Access denied' });
+    }
+
+    quiz.isLive = false;
+    quiz.endTime = new Date();
+    await quiz.save();
+
+    res.json({
+      success: true,
+      message: 'Quiz live session ended',
+      data: { quiz: quiz.toObject() }
+    });
+  } catch (error) {
+    console.error('End live error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to end live session',
       error: process.env.NODE_ENV === 'development' ? error.message : 'Internal server error'
     });
   }
