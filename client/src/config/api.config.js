@@ -16,7 +16,7 @@ export const getApiUrl = () => {
     // If hostname contains render.com, use Render backend URL
     if (window.location.hostname.includes('render.com')) {
       console.log('✅ Using Render backend URL');
-      return 'https://test-system-1-yiph.onrender.com/api';
+      return 'https://test-system-m678.onrender.com/api';
     }
     
     // If hostname contains vercel, netlify, etc., use Render backend URL
@@ -24,17 +24,17 @@ export const getApiUrl = () => {
         window.location.hostname.includes('vercel.com') ||
         window.location.hostname.includes('netlify.app')) {
       console.log('✅ Using Vercel/Netlify with Render backend URL');
-      return 'https://test-system-1-yiph.onrender.com/api';
+      return 'https://test-system-m678.onrender.com/api';
     }
     
     // Default production URL
     console.log('✅ Using default production URL');
-    return 'https://test-system-1-yiph.onrender.com/api';
+    return 'https://test-system-m678.onrender.com/api';
   }
 
   // 3. Development fallback
   console.log('🔧 Development mode, using localhost');
-  return 'http://localhost:10001/api';
+  return 'http://localhost:10000/api';
 };
 
 const apiUrl = getApiUrl();
