@@ -59,8 +59,12 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check endpoint
+// Health check endpoints
 app.get('/health', (req, res) => {
+  res.json({ status: 'OK', message: 'Server is running' });
+});
+
+app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Server is running' });
 });
 
